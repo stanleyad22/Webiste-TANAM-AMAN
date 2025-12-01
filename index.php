@@ -7,7 +7,6 @@
     $DATE_COL = 'tanggal_pengambilan_data';
     $bulanFilter = isset($_GET['bulan']) ? max(1, min(12, (int)$_GET['bulan'])) : (int)date('n');
     $tahunFilter = isset($_GET['tahun']) ? (int)$_GET['tahun'] : (int)date('Y');
-    // -- [BARU] Filter Pengambilan Data --
     $pengambilanFilter = isset($_GET['pengambilan']) ? (int)$_GET['pengambilan'] : null;
 
 
@@ -16,8 +15,6 @@
     $monthsByYear = [];
     $pengambilanOptions = []; 
 
-    // [DIUBAH] Query untuk mengambil tahun dari kolom teks 'tanggal_pengambilan_data'
-    // Format: "DD nama_bulan YYYY" (contoh: "05 Agustus 2024")
     $YEAR_EXPR = "CAST(SUBSTRING_INDEX($DATE_COL, ' ', -1) AS UNSIGNED)";
     $yearSql = "SELECT DISTINCT $YEAR_EXPR AS y
                 FROM riwayat_prediksi
@@ -68,32 +65,26 @@
     // ==== Tetapkan default: tahun/bulan terbaru dari DB bila filter GET tidak valid ====
     if (!empty($years)) {
         if (!in_array($tahunFilter, $years, true)) {
-            $tahunFilter = $years[0]; // tahun terbaru (karena DESC)
+            $tahunFilter = $years[0];
         }
         $availableMonths = $monthsByYear[$tahunFilter] ?? [];
         if (empty($availableMonths)) {
-            // tidak ada bulan untuk tahun tsb → fallback ke tahun terbaru yg punya bulan
             foreach ($years as $y) {
                 if (!empty($monthsByYear[$y])) { $tahunFilter = $y; $availableMonths = $monthsByYear[$y]; break; }
             }
         }
         if (empty($availableMonths)) {
-            // benar-benar tidak ada data tanggal di DB
             $bulanFilter = null;
         } else {
             if (!in_array($bulanFilter, $availableMonths, true)) {
-                $bulanFilter = max($availableMonths); // ambil bulan terbaru di tahun tsb
+                $bulanFilter = max($availableMonths);
             }
         }
     } else {
-        // Tidak ada data tanggal sama sekali → biarkan default hari ini (atau null)
         $tahunFilter = (int)date('Y');
         $bulanFilter = (int)date('n');
     }
 
-    // --- CATATAN: Bagian di bawah ini untuk KUOTA HARIAN, tetap menggunakan 'tanggal_input' ---
-    // --- karena kolom ini kemungkinan besar adalah timestamp kapan data dimasukkan (created_at) ---
-    // --- dan tidak berhubungan dengan tanggal pengambilan data di lapangan. ---
     $TIMESTAMP_COL = 'tanggal_input';
     date_default_timezone_set('Asia/Jakarta');
     $today = date('Y-m-d');
@@ -118,7 +109,6 @@
         error_log('[quota] prepare failed: ' . mysqli_error($conn));
     }
 
-    // Progress: 32 Kuota per hari
     $MAX_STEPS       = 32;
     $progressPercent   = min(100, round((min($todayCount, $MAX_STEPS) / $MAX_STEPS) * 100, 1));
     $progressLabel     = $progressPercent . '%';
@@ -293,7 +283,7 @@
 
     function koleksiWilayah($sumbu, $bulan = null, $tahun = null) {
         global $conn; 
-        $DATE_COL_KOLEKSI = 'tanggal_input'; // Tetap gunakan kolom lama untuk tabel ini
+        $DATE_COL_KOLEKSI = 'tanggal_input';
 
         $warna = ["#ff6666", "#ff9966", "#ffff99", "#99ff99", "#66ffcc", "#99ffff", "#9999ff", "#ff99ff", "#ce99ff"];
 
@@ -708,7 +698,6 @@
         });
     </script>
     <script>
-        // ... (Kode Pie Chart tidak berubah) ...
         document.addEventListener('DOMContentLoaded', () => {
             const chartArea = document.querySelector('.chart-area');
             const backButton = document.getElementById('backButton');
@@ -732,7 +721,6 @@
         backButton.addEventListener('click', function () { if (history.length > 0) { const previousState = history.pop(); currentLevel = previousState.level; pieChart.data.labels = previousState.labels; pieChart.data.datasets[0].data = previousState.data; pieChart.data.datasets[0].backgroundColor = previousState.colors; pieChart.update(); updatePieLevelLabel(); if (history.length === 0) { backButton.classList.remove('is-visible'); } } else { console.log("Tidak ada data sebelumnya untuk kembali."); } });
     </script>
     <script>
-        // ... (Kode Map/Leaflet tidak berubah) ...
         (function(){
             const provSelect = document.getElementById('filterProvinsi'); const sevSelect = document.getElementById('filterSeverity'); const bulanSelect = document.getElementById('filterBulan'); const tahunSelect = document.getElementById('filterTahun'); const pengambilanSelect = document.getElementById('filterPengambilan'); const statPanel = document.getElementById('statPanel');
             const map = L.map('mapTungro', { worldCopyJump: true, inertia: true, inertiaDeceleration: 3000, }); const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}); osm.addTo(map); const indoBounds = L.latLngBounds([[-11.2, 95.0], [6.2, 141.0]]); map.fitBounds(indoBounds, { animate: false }); map.setMaxBounds(indoBounds.pad(0.05)); map.setMinZoom(3); map.setMaxZoom(19); map.on('drag', () => map.panInsideBounds(indoBounds, { animate: true }));
@@ -753,7 +741,6 @@
         })();
     </script>
     <script>
-        // ... (Kode Gauge Chart tidak berubah) ...
         (function(){
             const gaugeEl = document.getElementById('apiGauge'); if(!gaugeEl) return;
             const pct = Number(gaugeEl.dataset.percent || 0); const stepsText = gaugeEl.dataset.steps || ''; const value = Math.max(0, Math.min(100, pct)); const data = [value, 100 - value];
@@ -764,11 +751,6 @@
     </script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // ======================================================
-            // == HELPER MODAL ALERT & KONFIRMASI KUSTOM ==
-            // ======================================================
-            
-            // --- Alert ---
             const customAlertModalEl = document.getElementById('customAlertModal');
             const customAlertModal = customAlertModalEl ? new bootstrap.Modal(customAlertModalEl) : null;
             const customAlertMessageEl = document.getElementById('customAlertMessage');
@@ -798,11 +780,9 @@
             }
 
             if (customAlertModalEl) {
-                // Gunakan class unik untuk tombol close alert
                 const alertCloseButton = customAlertModalEl.querySelector('.custom-alert-close-btn');
                 if (alertCloseButton) {
                     alertCloseButton.addEventListener('click', () => {
-                        // Tidak perlu lakukan apa-apa di sini, biarkan event hidden.bs.modal yang handle
                     });
                 }
 
@@ -813,33 +793,26 @@
                         currentAlertOnHiddenCallback = null; 
                     }
                     if (alertQueue.length > 0) {
-                        setTimeout(showNextAlert, 50); // Jeda sedikit agar tidak langsung tumpang tindih
+                        setTimeout(showNextAlert, 50);
                     }
                 });
             }
 
-            // --- Confirm ---
             const customConfirmModalEl = document.getElementById('customConfirmModal');
             const customConfirmModal = customConfirmModalEl ? new bootstrap.Modal(customConfirmModalEl) : null;
             const customConfirmMessageEl = document.getElementById('customConfirmMessage');
             const customConfirmYesBtn = document.getElementById('customConfirmYesBtn');
             const customConfirmNoBtn = document.getElementById('customConfirmNoBtn');
-            let currentConfirmResolve = null; // Menyimpan fungsi resolve dari Promise
+            let currentConfirmResolve = null; 
 
-            /**
-             * Menampilkan konfirmasi kustom menggunakan Promise.
-             * @param {string} message Pesan konfirmasi.
-             * @returns {Promise<boolean>} Promise yang resolve ke true jika "Ya" diklik, false jika "Tidak" diklik.
-             */
             function showCustomConfirm(message) {
                 return new Promise((resolve) => {
                     if (!customConfirmModal || !customConfirmMessageEl || !customConfirmYesBtn || !customConfirmNoBtn) {
                         console.warn('Custom confirm modal elements not found. Falling back to native confirm.');
-                        resolve(confirm(message)); // Fallback ke confirm bawaan
+                        resolve(confirm(message)); 
                         return;
                     }
 
-                    // Simpan fungsi resolve untuk digunakan nanti
                     currentConfirmResolve = resolve; 
 
                     customConfirmMessageEl.textContent = message;
@@ -847,12 +820,11 @@
                 });
             }
 
-            // Tambahkan listener HANYA SEKALI saat setup
             if (customConfirmYesBtn) {
                 customConfirmYesBtn.addEventListener('click', () => {
                     if (currentConfirmResolve) {
-                        currentConfirmResolve(true); // Resolve promise dengan true
-                        currentConfirmResolve = null; // Reset
+                        currentConfirmResolve(true);
+                        currentConfirmResolve = null;
                     }
                     customConfirmModal.hide();
                 });
@@ -860,26 +832,20 @@
             if (customConfirmNoBtn) {
                 customConfirmNoBtn.addEventListener('click', () => {
                     if (currentConfirmResolve) {
-                        currentConfirmResolve(false); // Resolve promise dengan false
-                        currentConfirmResolve = null; // Reset
+                        currentConfirmResolve(false);
+                        currentConfirmResolve = null;
                     }
                     customConfirmModal.hide();
                 });
             }
-            // Event listener saat modal ditutup (misal klik backdrop atau escape) dianggap 'Tidak'
             if (customConfirmModalEl) {
                  customConfirmModalEl.addEventListener('hidden.bs.modal', () => {
-                    if (currentConfirmResolve) { // Jika masih ada resolve (belum klik Ya/Tidak)
-                        currentConfirmResolve(false); // Anggap "Tidak"
-                        currentConfirmResolve = null; // Reset
+                    if (currentConfirmResolve) {
+                        currentConfirmResolve(false); 
+                        currentConfirmResolve = null;
                     }
                 });
             }
-
-            // ======================================================
-            // == AKHIR HELPER MODAL ==
-            // ======================================================
-
 
             const userIsLoggedIn = <?php echo json_encode(isset($_SESSION['user_id'])); ?>;
             const userIsAdmin    = <?php echo json_encode(isset($_SESSION['status']) && $_SESSION['status'] === 'admin'); ?>;
@@ -894,7 +860,7 @@
             let curationPage = 1; let curationSort = 'tanggal_input'; let curationDir  = 'DESC'; 
             const curationInfoEl = document.getElementById('curationInfo'); const curationPaginationEl = document.getElementById('curationPagination');
             function setSortIndicator() { document.querySelectorAll('#curationTable thead th.sortable .sort-indicator').forEach(el => el.textContent = ''); const activeTh = document.querySelector(`#curationTable thead th.sortable[data-sort="${curationSort}"] .sort-indicator`); if (activeTh) activeTh.textContent = (curationDir === 'ASC' ? '▲' : '▼'); }
-            function buildPagination(totalPages, current) { /* ... (fungsi buildPagination tidak berubah) ... */ curationPaginationEl.innerHTML = ''; if (totalPages <= 1) return; function addItem(label, page, disabled=false, active=false) { const li = document.createElement('li'); li.className = `page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}`; const a = document.createElement('a'); a.className = 'page-link'; a.href = '#'; a.textContent = label; a.addEventListener('click', (e) => { e.preventDefault(); if (disabled || active) return; curationPage = page; loadCurationData(); }); li.appendChild(a); curationPaginationEl.appendChild(li); } addItem('«', 1, current === 1); addItem('‹', Math.max(1, current - 1), current === 1); const windowSize = 7; let start = Math.max(1, current - Math.floor(windowSize/2)); let end = Math.min(totalPages, start + windowSize - 1); if (end - start + 1 < windowSize) start = Math.max(1, end - windowSize + 1); for (let p = start; p <= end; p++) { addItem(String(p), p, false, p === current); } addItem('›', Math.min(totalPages, current + 1), current === totalPages); addItem('»', totalPages, current === totalPages); }
+            function buildPagination(totalPages, current) { curationPaginationEl.innerHTML = ''; if (totalPages <= 1) return; function addItem(label, page, disabled=false, active=false) { const li = document.createElement('li'); li.className = `page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}`; const a = document.createElement('a'); a.className = 'page-link'; a.href = '#'; a.textContent = label; a.addEventListener('click', (e) => { e.preventDefault(); if (disabled || active) return; curationPage = page; loadCurationData(); }); li.appendChild(a); curationPaginationEl.appendChild(li); } addItem('«', 1, current === 1); addItem('‹', Math.max(1, current - 1), current === 1); const windowSize = 7; let start = Math.max(1, current - Math.floor(windowSize/2)); let end = Math.min(totalPages, start + windowSize - 1); if (end - start + 1 < windowSize) start = Math.max(1, end - windowSize + 1); for (let p = start; p <= end; p++) { addItem(String(p), p, false, p === current); } addItem('›', Math.min(totalPages, current + 1), current === totalPages); addItem('»', totalPages, current === totalPages); }
 
             const openLoginBtn = document.getElementById('openLoginBtn'); if (openLoginBtn) { openLoginBtn.addEventListener('click', () => { loginModal?.show(); }); }
             const openCurationBtn = document.getElementById('openCurationPanel'); if (openCurationBtn) { openCurationBtn.addEventListener('click', () => { if (!userIsLoggedIn) { showCustomAlert('Anda harus login.', 'error'); loginModal?.show(); return; } if (!userIsAdmin) { showCustomAlert('Hanya admin yang dapat mengakses menu verifikasi data.', 'error'); return; } loadCurationData(); curationModal?.show(); }); }
@@ -963,17 +929,15 @@
                 curationTableBody.addEventListener('change', (e) => { if (e.target.classList.contains('check-row-curation')) { checkCurationButtonState(); if (checkAllCuration) { const total = curationTableBody.querySelectorAll('.check-row-curation').length; const checked = curationTableBody.querySelectorAll('.check-row-curation:checked').length; checkAllCuration.checked = total > 0 && total === checked; } } });
             }
             
-            // --- [DIUBAH] Menggunakan showCustomConfirm ---
             if (btnVerifyCuration) {
                 btnVerifyCuration.addEventListener('click', async () => { 
                     const checkedRows = curationTableBody.querySelectorAll('.check-row-curation:checked');
                     const idsToVerify = Array.from(checkedRows).map(cb => cb.value);
                     if (idsToVerify.length === 0) return;
 
-                    // Tampilkan konfirmasi kustom
                     const userConfirmed = await showCustomConfirm(`Anda yakin ingin memverifikasi ${idsToVerify.length} data terpilih?`);
                     
-                    if (!userConfirmed) return; // Jika pengguna klik "Tidak"
+                    if (!userConfirmed) return; 
 
                     btnVerifyCuration.disabled = true; btnVerifyCuration.textContent = 'Memverifikasi...';
                     try {
@@ -981,21 +945,19 @@
                         const result = await response.json();
                         showCustomAlert(result.message, result.success ? 'success' : 'error', () => { if (result.success) { loadCurationData(); } });
                     } catch (error) { console.error('Error verifying data:', error); showCustomAlert('Terjadi kesalahan koneksi saat verifikasi.', 'error');
-                    } finally { btnVerifyCuration.disabled = true; /* Akan di-enable lagi oleh checkCurationButtonState() */ btnVerifyCuration.textContent = 'Verifikasi Data Terpilih'; }
+                    } finally { btnVerifyCuration.disabled = true; btnVerifyCuration.textContent = 'Verifikasi Data Terpilih'; }
                 });
             }
             
-            // --- [DIUBAH] Menggunakan showCustomConfirm ---
             if (btnDeleteCuration){
                 btnDeleteCuration.addEventListener('click', async () => {
                     const checkedRows = curationTableBody.querySelectorAll('.check-row-curation:checked');
                     const idsToDelete = Array.from(checkedRows).map(cb => cb.value);
                     if (idsToDelete.length === 0) return;
 
-                    // Tampilkan konfirmasi kustom
                     const userConfirmed = await showCustomConfirm(`Anda yakin ingin menghapus ${idsToDelete.length} data terpilih? Tindakan ini tidak dapat dibatalkan.`);
 
-                    if (!userConfirmed) return; // Jika pengguna klik "Tidak"
+                    if (!userConfirmed) return;
 
                     btnDeleteCuration.disabled = true; const oldText = btnDeleteCuration.textContent; btnDeleteCuration.textContent = 'Menghapus...';
                     try {
@@ -1004,7 +966,7 @@
                         const alertMessage = result.message || (result.success ? 'Berhasil menghapus data.' : 'Gagal menghapus data.');
                         showCustomAlert(alertMessage, result.success ? 'success' : 'error', () => { if (result.success) { loadCurationData(); } });
                     } catch (err) { console.error('Error deleting data:', err); showCustomAlert('Terjadi kesalahan koneksi saat menghapus.', 'error');
-                    } finally { btnDeleteCuration.disabled = true; /* Akan di-enable lagi oleh checkCurationButtonState() */ btnDeleteCuration.textContent = oldText; }
+                    } finally { btnDeleteCuration.disabled = true; btnDeleteCuration.textContent = oldText; }
                 });
             }
 
@@ -1019,12 +981,7 @@
             }
 
 
-            async function loadCurationData() { /* ... (fungsi loadCurationData tidak berubah) ... */ const limit = parseInt(curationRowsSelect?.value || '10', 10); const loadingRow = '<tr><td colspan="12" class="text-center">Memuat data...</td></tr>'; if(curationTableBody) curationTableBody.innerHTML = loadingRow; try { const url = `get_curation_data.php?limit=${encodeURIComponent(limit)}&page=${encodeURIComponent(curationPage)}&sort=${encodeURIComponent(curationSort)}&dir=${encodeURIComponent(curationDir)}`; const response = await fetch(url); const result = await response.json(); if(curationTableBody) curationTableBody.innerHTML = ''; if (result.success) { const rows = result.data || []; if (rows.length > 0) { rows.forEach(row => { const tr = ` <tr> <td><input class="form-check-input check-row-curation" type="checkbox" value="${row.id}"></td> <td>${row.tanggal_input ?? '-'}</td> <td>${row.kecamatan_simple || '-'}</td> <td>${row.nama_wilayah || '-'}</td> <td>${row.waktu_semai ?? '-'}</td> <td>${row.pengambilan_data ?? '-'}</td> <td>${row.suhu ?? '-'}</td> <td>${row.presipitasi ?? '-'}</td> <td>${row.populasi_wereng ?? '-'}</td> <td>${row.varietas_padi || '-'}</td> <td>${row.virulensi || '-'}</td> <td>${row.persentase_insidensi ?? '-'}</td> </tr> `; if(curationTableBody) curationTableBody.insertAdjacentHTML('beforeend', tr); }); if(curationInfoEl) curationInfoEl.textContent = `Halaman ${result.page} dari ${result.total_pages} • Total ${result.total} data`; buildPagination(result.total_pages, result.page); } else { if(curationInfoEl) curationInfoEl.textContent = 'Halaman 1 dari 1 • Total 0 data'; if(curationPaginationEl) curationPaginationEl.innerHTML = ''; if(curationTableBody) curationTableBody.innerHTML = '<tr><td colspan="12" class="text-center">Tidak ada data untuk diverifikasi.</td></tr>'; } } else { if(curationInfoEl) curationInfoEl.textContent = ''; if(curationPaginationEl) curationPaginationEl.innerHTML = ''; if(curationTableBody) curationTableBody.innerHTML = `<tr><td colspan="12" class="text-center text-danger">Gagal memuat data: ${result.message || 'Kesalahan tidak diketahui.'}</td></tr>`; console.error("Gagal load kurasi:", result.message); } } catch (error) { console.error('Error fetching curation data:', error); if(curationInfoEl) curationInfoEl.textContent = ''; if(curationPaginationEl) curationPaginationEl.innerHTML = ''; if(curationTableBody) curationTableBody.innerHTML = '<tr><td colspan="12" class="text-center text-danger">Gagal memuat data. Periksa koneksi atau log server.</td></tr>'; } finally { if(checkAllCuration) checkAllCuration.checked = false; checkCurationButtonState(); setSortIndicator(); } }
-
-            // Panggil loadCurationData jika modal kurasi ada saat load halaman (jika diperlukan)
-            // if (curationModalEl) {
-            //    loadCurationData(); // Uncomment jika data perlu dimuat saat halaman pertama kali dibuka
-            // }
+            async function loadCurationData() {  const limit = parseInt(curationRowsSelect?.value || '10', 10); const loadingRow = '<tr><td colspan="12" class="text-center">Memuat data...</td></tr>'; if(curationTableBody) curationTableBody.innerHTML = loadingRow; try { const url = `get_curation_data.php?limit=${encodeURIComponent(limit)}&page=${encodeURIComponent(curationPage)}&sort=${encodeURIComponent(curationSort)}&dir=${encodeURIComponent(curationDir)}`; const response = await fetch(url); const result = await response.json(); if(curationTableBody) curationTableBody.innerHTML = ''; if (result.success) { const rows = result.data || []; if (rows.length > 0) { rows.forEach(row => { const tr = ` <tr> <td><input class="form-check-input check-row-curation" type="checkbox" value="${row.id}"></td> <td>${row.tanggal_input ?? '-'}</td> <td>${row.kecamatan_simple || '-'}</td> <td>${row.nama_wilayah || '-'}</td> <td>${row.waktu_semai ?? '-'}</td> <td>${row.pengambilan_data ?? '-'}</td> <td>${row.suhu ?? '-'}</td> <td>${row.presipitasi ?? '-'}</td> <td>${row.populasi_wereng ?? '-'}</td> <td>${row.varietas_padi || '-'}</td> <td>${row.virulensi || '-'}</td> <td>${row.persentase_insidensi ?? '-'}</td> </tr> `; if(curationTableBody) curationTableBody.insertAdjacentHTML('beforeend', tr); }); if(curationInfoEl) curationInfoEl.textContent = `Halaman ${result.page} dari ${result.total_pages} • Total ${result.total} data`; buildPagination(result.total_pages, result.page); } else { if(curationInfoEl) curationInfoEl.textContent = 'Halaman 1 dari 1 • Total 0 data'; if(curationPaginationEl) curationPaginationEl.innerHTML = ''; if(curationTableBody) curationTableBody.innerHTML = '<tr><td colspan="12" class="text-center">Tidak ada data untuk diverifikasi.</td></tr>'; } } else { if(curationInfoEl) curationInfoEl.textContent = ''; if(curationPaginationEl) curationPaginationEl.innerHTML = ''; if(curationTableBody) curationTableBody.innerHTML = `<tr><td colspan="12" class="text-center text-danger">Gagal memuat data: ${result.message || 'Kesalahan tidak diketahui.'}</td></tr>`; console.error("Gagal load kurasi:", result.message); } } catch (error) { console.error('Error fetching curation data:', error); if(curationInfoEl) curationInfoEl.textContent = ''; if(curationPaginationEl) curationPaginationEl.innerHTML = ''; if(curationTableBody) curationTableBody.innerHTML = '<tr><td colspan="12" class="text-center text-danger">Gagal memuat data. Periksa koneksi atau log server.</td></tr>'; } finally { if(checkAllCuration) checkAllCuration.checked = false; checkCurationButtonState(); setSortIndicator(); } }
 
         });
     </script>
