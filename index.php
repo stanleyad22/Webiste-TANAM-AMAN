@@ -1,15 +1,7 @@
-<?php 
-    $servername = "127.0.0.1";
-    $username = "root";
-    $password = "";
-    $dbname = "tand8989_koleksi_data";
-    $conn = mysqli_connect($servername, $username, $password, $dbname);
-
-    if (!$conn) {
-        die("Connection failed: " . mysqli_connect_error());
-    }
-
-    date_default_timezone_set('Asia/Jakarta');
+<?php
+    session_start();
+    
+    require 'koneksi.php';
 
     // ---- FILTER BULAN, TAHUN & PENGAMBILAN DATA
     $DATE_COL = 'tanggal_pengambilan_data';
@@ -29,7 +21,7 @@
     $YEAR_EXPR = "CAST(SUBSTRING_INDEX($DATE_COL, ' ', -1) AS UNSIGNED)";
     $yearSql = "SELECT DISTINCT $YEAR_EXPR AS y
                 FROM riwayat_prediksi
-                WHERE $DATE_COL IS NOT NULL AND $DATE_COL RLIKE '^[0-9]{1,2} [a-zA-Z]+ [0-9]{4}$'
+                WHERE $DATE_COL IS NOT NULL AND verifikasi = 1 AND $DATE_COL RLIKE '^[0-9]{1,2} [a-zA-Z]+ [0-9]{4}$'
                 ORDER BY y DESC";
     if ($resY = mysqli_query($conn, $yearSql)) {
         while ($r = mysqli_fetch_assoc($resY)) {
@@ -48,7 +40,7 @@
                         ELSE NULL END)";
     $ymSql = "SELECT DISTINCT $YEAR_EXPR AS y, $MONTH_EXPR AS m
             FROM riwayat_prediksi
-            WHERE $DATE_COL IS NOT NULL AND $DATE_COL RLIKE '^[0-9]{1,2} [a-zA-Z]+ [0-9]{4}$'
+            WHERE $DATE_COL IS NOT NULL AND verifikasi = 1 AND $DATE_COL RLIKE '^[0-9]{1,2} [a-zA-Z]+ [0-9]{4}$'
             ORDER BY y DESC, m ASC";
     if ($resYM = mysqli_query($conn, $ymSql)) {
         while ($r = mysqli_fetch_assoc($resYM)) {
@@ -64,6 +56,7 @@
     $pengambilanSql = "SELECT DISTINCT pengambilan_data 
                        FROM riwayat_prediksi 
                        WHERE pengambilan_data IS NOT NULL 
+                       AND verifikasi = 1
                        ORDER BY pengambilan_data ASC";
     if ($resP = mysqli_query($conn, $pengambilanSql)) {
         while ($r = mysqli_fetch_assoc($resP)) {
@@ -126,24 +119,24 @@
     }
 
     // Progress: 32 Kuota per hari
-    $MAX_STEPS        = 32;
-    $progressPercent  = min(100, round((min($todayCount, $MAX_STEPS) / $MAX_STEPS) * 100, 1));
-    $progressLabel    = $progressPercent . '%';
+    $MAX_STEPS       = 32;
+    $progressPercent   = min(100, round((min($todayCount, $MAX_STEPS) / $MAX_STEPS) * 100, 1));
+    $progressLabel     = $progressPercent . '%';
     $progressStepLabel = $todayCount . '/' . $MAX_STEPS;
 
 
     $sql = "SELECT
-            TRIM(SUBSTRING_INDEX(kecamatan, ',', 1))                                         AS kecamatan,
-            TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(kecamatan, ',', 2), ',', -1))               AS kabupaten,
-            TRIM(SUBSTRING_INDEX(kecamatan, ',', -1))                                        AS provinsi,
+            TRIM(SUBSTRING_INDEX(kecamatan, ',', 1))                                AS kecamatan,
+            TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(kecamatan, ',', 2), ',', -1))      AS kabupaten,
+            TRIM(SUBSTRING_INDEX(kecamatan, ',', -1))                                AS provinsi,
 
-            AVG(populasi_wereng)      AS avg_populasi_wereng,
-            AVG(suhu)                 AS avg_suhu,
-            AVG(presipitasi)          AS avg_presipitasi,
-            AVG(persentase_insidensi) AS avg_persentase_insidensi,
+            AVG(populasi_wereng)        AS avg_populasi_wereng,
+            AVG(suhu)                   AS avg_suhu,
+            AVG(presipitasi)            AS avg_presipitasi,
+            AVG(persentase_insidensi)   AS avg_persentase_insidensi,
 
-            SUM(CASE WHEN LOWER(varietas_padi) = 'rentan' THEN 1 ELSE 0 END)          AS rentan,
-            SUM(CASE WHEN LOWER(varietas_padi) = 'tahan'  THEN 1 ELSE 0 END)          AS tahan,
+            SUM(CASE WHEN LOWER(varietas_padi) = 'rentan' THEN 1 ELSE 0 END)        AS rentan,
+            SUM(CASE WHEN LOWER(varietas_padi) = 'tahan'  THEN 1 ELSE 0 END)        AS tahan,
             virulensi
         FROM riwayat_prediksi 
         GROUP BY kecamatan;"; 
@@ -188,9 +181,9 @@
 
         $v = strtolower(trim($row['virulensi'] ?? ''));
         if ($v !== '') {
-            if (strpos($v,'sangat') !== false)      { $agg[$kec]['vir']['Sangat Virulen']++; $agg[$kec]['vir_last'] = 'Sangat Virulen'; }
-            elseif (strpos($v,'tidak') !== false)   { $agg[$kec]['vir']['Tidak Virulen']++;  $agg[$kec]['vir_last'] = 'Tidak Virulen'; }
-            else                                    { $agg[$kec]['vir']['Virulen']++;        $agg[$kec]['vir_last'] = 'Virulen'; }
+            if (strpos($v,'sangat') !== false)     { $agg[$kec]['vir']['Sangat Virulen']++; $agg[$kec]['vir_last'] = 'Sangat Virulen'; }
+            elseif (strpos($v,'tidak') !== false)  { $agg[$kec]['vir']['Tidak Virulen']++;  $agg[$kec]['vir_last'] = 'Tidak Virulen'; }
+            else                                   { $agg[$kec]['vir']['Virulen']++;        $agg[$kec]['vir_last'] = 'Virulen'; }
         }
 
         if (isset($row['rentan'])) { $agg[$kec]['var']['Rentan'] += (int)$row['rentan']; }
@@ -354,128 +347,8 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i&amp;display=swap">
     <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <style>
-        .chart-area { position: relative; min-height: 275px;}
-        .chart-area canvas { position: relative; z-index: 1; display: block; }
-
-        /* Tombol 'Kembali' di tengah donut */
-        .chart-back-btn{
-            font-size:.8rem; padding:.2rem .5rem;
-            position: absolute;
-            left: 50%;
-            top: calc(50% + 8px); 
-            transform: translate(-50%, -50%);
-            z-index: 3;
-            box-shadow: 0 2px 8px rgba(0,0,0,.2);
-            opacity: .95;
-            display: none;
-        }
-
-        .chart-back-btn.is-visible{ display: inline-block; }
-
-        #mapTungro { height: 420px; border-radius: .5rem; }
-
-        #wrapper #content-wrapper{
-            background-color: #ffffff;
-        }
-        .global-filter .form-select { min-width: 140px; }
-        .title-header{
-            font-family: 'Papyrus';
-            color: #000000;
-        }
-        .card-header-text{
-            color: #ffffff;
-        }
-        .card{
-            --bs-card-cap-bg :#6CD756;
-        }
-        :root{
-            --bs-primary :#4AB83F;
-            --bs-primary-rgb: 74, 184, 63;
-
-            --bs-success : #6CD756;
-            --bs-success-rgb: 108, 215, 86;
-
-            --bs-danger : #FE6555;
-            --bs-danger-rgb: 254, 101, 85;
-
-            --bs-warning : #FCDA00;
-            --bs-warning-rgb: 252, 218, 0;
-        }
-        .legend { background: #fff; padding: .5rem .75rem; line-height: 1.1; border-radius:.5rem; box-shadow:0 1px 6px rgba(0,0,0,.1);}
-        .legend i { width: 16px; height: 10px; float: left; margin-right: .5rem; opacity: 0.8; }
-
-        .gauge-wrap{
-            position: relative;
-            height: 75px;
-            display: flex;
-            flex-direction: row;
-        }
-        .gauge-inner{
-            max-width: 300px;
-        }
-        #gauge, #apiGauge{
-            display: block;
-        }
-        .gauge-label{
-            position: absolute;
-            left: 50%;
-            top: 60%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            z-index: 2;
-        }
-        .gauge-title{
-            position: absolute;
-            top: 10%;
-            left: 50%;
-            text-align: center;
-            transform: translate(-50%, -50%);
-            font-size:1.05rem; 
-            font-weight: bold;
-            margin-bottom:.15rem; }
-        .gauge-percent{ font-weight:700; font-size:1.95rem; line-height:1; }
-
-        .welcome-chat{
-            display:flex; gap:12px; align-items:flex-start;
-            margin: 8px 0 14px 0;
-        }
-        .welcome-avatar{
-            width:56px; height:56px; border-radius:14px;
-            background:#FFFFFF; display:flex; align-items:center; justify-content:center;
-            font-size:34px; 
-            flex: 0 0 56px;
-            overflow:hidden;
-        }
-        .welcome-avatar img{ width:100%; height:100%; object-fit:contain; }
-        .welcome-bubble{
-            background:#ffffff; color:#666; border:1px solid #eef2ee;
-            padding:14px 16px; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,.06);
-            font-size:1.05rem; line-height:1.35;
-        }
-        .info-modal .welcome-cursor{
-            display:inline-block;width:2px;height:1.05em;margin-left:2px;
-            background:#888;animation:blink 1s steps(2,start) infinite;vertical-align:-2px;
-        }
-        @keyframes blink { 50%{ background:transparent; } }
-
-        .pie-level-badge{
-            position:absolute;
-            top:-10%;
-            left:50%;
-            transform:translateX(-50%);
-            z-index:2;
-            background:#ffffff;
-            padding:4px 10px;
-            border-radius:999px;
-            font-size:1.05rem;
-            font-weight: bold;
-            color:#555;
-            pointer-events:none; /* supaya tidak menghalangi klik chart */
-        }
-
-    
-    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 
 <body id="page-top">
@@ -485,6 +358,25 @@
                 <div class="container-fluid">
                     <div class="d-sm-flex justify-content-between align-items-center mb-2" style="margin-top: 20px;">
                         <h3 class="mb-2 mt-2 title-header">Dashboard Tanamaman</h3>
+                        
+                        <?php if (isset($_SESSION['user_id'])): ?>
+                            <div class="dropdown">
+                                <button class="btn btn-success btn-sm text-white dropdown-toggle" style="background:#6CD756" type="button" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-user me-1"></i> 
+                                    Halo, <?= htmlspecialchars(explode(' ', $_SESSION['nama_lengkap'])[0]) ?>
+                                    <?= (isset($_SESSION['status']) && $_SESSION['status'] === 'admin') ? '<span class="badge bg-warning ms-1">Admin</span>' : '' ?> 
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+                                    <li><a class="dropdown-item" href="logout.php">
+                                        <i class="fas fa-sign-out-alt me-2"></i>Logout
+                                    </a></li>
+                                </ul>
+                            </div>
+                        <?php else: ?>
+                            <button id="openLoginBtn" type="button" class="btn btn-success btn-sm text-white" style="background:#6CD756">
+                                <i class="fas fa-sign-in-alt me-1"></i> Masuk
+                            </button>
+                        <?php endif; ?>
                     </div>
                     <div class="row">
                         
@@ -524,6 +416,11 @@
                         </div>
                         <div class="col-auto ms-auto">
                             <label class="small text-muted mb-1 d-block">&nbsp;</label>
+                            <?php if (isset($_SESSION['user_id']) && isset($_SESSION['status']) && $_SESSION['status'] === 'admin'): ?>
+                                <button id="openCurationPanel" style="background:#6CD756" type="button" class="btn btn-success btn-sm text-white me-2">
+                                <i class="fas fa-check-double me-1"></i> Verifikasi Data
+                                </button>
+                            <?php endif; ?>
                             <button id="openInfoPanel" style="background:#6CD756" type="button" class="btn btn-success btn-sm text-white">
                                 <i class="fas fa-info-circle me-1"></i> Informasi Situs
                             </button>
@@ -548,7 +445,7 @@
                         </div>
 
                     </div>
-                
+                    
 
                     <div class="row">
                         <div class="col-lg-7 col-xl-8">
@@ -616,693 +513,523 @@
             <footer class="bg-white sticky-footer"></footer>
         </div><a class="border rounded d-inline scroll-to-top" href="#page-top"><i class="fas fa-angle-up"></i></a>
     </div>
+
+    <div class="modal fade auth-modal" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title" id="loginModalLabel">Masuk</h5>
+                    </div>
+                <div class="modal-body">
+                    <form id="loginForm">
+                        <div class="form-group">
+                            <label for="loginEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="loginEmail" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="loginPassword" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="loginPassword" required>
+                            <i class="fas fa-eye-slash form-control-icon-right" id="togglePassword"></i>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-login">Login</button>
+                    </form>
+                    <div class="social-login">
+                        <p>Belum punya akun? <a href="#" id="openRegisterFromLogin">Daftar</a></p> 
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade auth-modal" id="registerModal" tabindex="-1" aria-labelledby="registerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center">
+                     <h5 class="modal-title" id="registerModalLabel">Daftar</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="registerForm">
+                        <div class="form-group">
+                            <label for="regNama" class="form-label">Nama Lengkap</label>
+                            <input type="text" class="form-control" id="regNama" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="regEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="regEmail" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="regDomisili" class="form-label">Domisili</label>
+                            <input type="text" class="form-control" id="regDomisili" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="regTelepon" class="form-label">Nomor Telepon</label>
+                            <input type="tel" class="form-control" id="regTelepon" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="regPassword" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="regPassword" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-login mt-3">Daftar</button>
+                    </form>
+                     <div class="signup-link">
+                         <p>Sudah punya akun? <a href="#" id="openLoginFromRegister">Masuk</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="curationModal" tabindex="-1" aria-labelledby="curationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="curationModalLabel">Verifikasi Data</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-end mb-2">
+                        <label for="curationRows" class="form-label me-2 col-auto col-form-label">Tampilkan:</label>
+                        <div class="col-auto">
+                            <select class="form-select form-select-sm" id="curationRows">
+                                <option value="10" selected>10 baris</option>
+                                <option value="20">20 baris</option>
+                                <option value="50">50 baris</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="curationTable">
+                        <thead>
+                            <tr>
+                                <th scope="col">
+                                <input class="form-check-input" type="checkbox" id="checkAllCuration">
+                                </th>
+                                <th scope="col" class="sortable" data-sort="tanggal_input">Tanggal Prediksi <span class="sort-indicator"></span></th>
+                                <th scope="col" class="sortable" data-sort="kecamatan">Kecamatan <span class="sort-indicator"></span></th>
+                                <th scope="col" class="sortable" data-sort="nama_wilayah">Nama Wilayah <span class="sort-indicator"></span></th>
+                                <th scope="col" class="sortable" data-sort="waktu_semai">Waktu Semai <span class="sort-indicator"></span></th>
+                                <th scope="col" class="sortable" data-sort="pengambilan_data">Pengambilan Data <span class="sort-indicator"></span></th>
+                                <th scope="col" class="sortable" data-sort="suhu">Suhu <span class="sort-indicator"></span></th>
+                                <th scope="col" class="sortable" data-sort="presipitasi">Presipitasi <span class="sort-indicator"></span></th>
+                                <th scope="col" class="sortable" data-sort="populasi_wereng">Populasi Wereng <span class="sort-indicator"></span></th>
+                                <th scope="col" class="sortable" data-sort="varietas_padi">Varietas <span class="sort-indicator"></span></th>
+                                <th scope="col" class="sortable" data-sort="virulensi">Virulensi <span class="sort-indicator"></span></th>
+                                <th scope="col" class="sortable" data-sort="persentase_insidensi">Persentase Insidensi <span class="sort-indicator"></span></th>
+                            </tr>
+                        </thead>
+                            <tbody id="curationTableBody"></tbody>
+                        </table>
+                        
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                            <div id="curationInfo" class="small text-muted"></div>
+                            <nav>
+                                <ul class="pagination pagination-sm mb-0" id="curationPagination"></ul>
+                            </nav>
+                        </div>
+                     </div>
+                     <div class="modal-footer d-flex justify-content-between">
+                        <?php if (isset($_SESSION['status']) && $_SESSION['status'] === 'admin'): ?>
+                            <div>
+                            <button type="button" class="btn btn-danger" id="btnDeleteCuration" disabled>
+                                Hapus Terpilih
+                            </button>
+                            </div>
+                            <div>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                            <button type="button" class="btn btn-success text-white" style="background:#4AB83F;" id="btnVerifyCuration" disabled>
+                                Verifikasi Data Terpilih
+                            </button>
+                            </div>
+                        <?php else: ?>
+                            <div class="ms-auto">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+            </div>
+        </div>
+    </div>
     
+    <div class="modal fade" id="customAlertModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+            <div class="modal-content" style="border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+                <div class="modal-body p-4 text-center">
+                    <p id="customAlertMessage" class="mb-4" style="font-size: 1.1rem; font-weight: 500; color: #333; line-height: 1.5;"></p>
+                    <button type="button" class="btn w-100 custom-alert-close-btn" data-bs-dismiss="modal" style="background:#6CD756; color:white; font-weight: 600; padding: 10px 0; border-radius: 8px;">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="customConfirmModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+            <div class="modal-content" style="border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+                <div class="modal-body p-4 text-center">
+                    <p id="customConfirmMessage" class="mb-4" style="font-size: 1.1rem; font-weight: 500; color: #333; line-height: 1.5;"></p>
+                    <div class="d-flex justify-content-center gap-2">
+                        <button type="button" class="btn btn-secondary flex-grow-1" id="customConfirmNoBtn" style="font-weight: 600; padding: 10px 0; border-radius: 8px;">Tidak</button>
+                        <button type="button" class="btn flex-grow-1" id="customConfirmYesBtn" style="background:#6CD756; color:white; font-weight: 600; padding: 10px 0; border-radius: 8px;">Ya</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.bundle.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
+        // ... (Kode Typewriter tidak berubah) ...
         document.addEventListener('DOMContentLoaded', function () {
-        const panelEl = document.getElementById('infoPanel');
-        const openBtn = document.getElementById('openInfoPanel');
+            const panelEl = document.getElementById('infoPanel');
+            const openBtn = document.getElementById('openInfoPanel');
 
-        // Buka panel saat tombol diklik
-        if (openBtn && panelEl) {
-            openBtn.addEventListener('click', () => {
-            new bootstrap.Modal(panelEl).show();
-            });
-        }
-
-        let hasTyped = false;
-        function runTypewriter(){
-            if (hasTyped) return; hasTyped = true;
-
-            const el = document.getElementById('welcomeTyped');
-            const cursor = document.querySelector('#infoPanel .welcome-cursor');
-            if (!el) return;
-
-            const parts = [
-            'Website ini menampilkan ringkasan hasil prediksi insidensi penyakit tungro yang dikumpulkan dari aplikasi Tanamaman.',
-            { type: 'break' },
-            { type: 'break' },
-            'Aplikasi Tanamaman adalah aplikasi untuk membantu petani di Indonesia dalam memprediksi penyakit tungro pada padi.',
-            { type: 'break' },
-            { type: 'break' },
-            'Klik link berikut untuk mendownload aplikasi tanamaman ',
-            { href: 'https://drive.google.com/drive/folders/1Xw7g16SIevxKxDVOrl5R_DXwYfKp1s-n?usp=sharing', text: 'Aplikasi Tanamaman' }
-            ];
-
-            let partIdx = 0, charIdx = 0;
-            let textNode = document.createTextNode('');
-            el.appendChild(textNode);
-
-            function type() {
-            if (partIdx >= parts.length) {
-                setTimeout(() => cursor && (cursor.style.display = 'none'), 900);
-                return;
+            if (openBtn && panelEl) {
+                openBtn.addEventListener('click', () => {
+                new bootstrap.Modal(panelEl).show();
+                });
             }
 
-            const part = parts[partIdx];
-
-            if (part.type === 'break') {
-                el.appendChild(document.createElement('br'));
-                partIdx++;
-                textNode = document.createTextNode('');
-                el.appendChild(textNode);
-                return void setTimeout(type, 25);
+            let hasTyped = false;
+            function runTypewriter(){
+                if (hasTyped) return; hasTyped = true;
+                const el = document.getElementById('welcomeTyped');
+                const cursor = document.querySelector('#infoPanel .welcome-cursor');
+                if (!el) return;
+                const parts = [ 'Website ini menampilkan ringkasan hasil prediksi insidensi penyakit tungro yang dikumpulkan dari aplikasi Tanamaman.', { type: 'break' }, { type: 'break' }, 'Aplikasi Tanamaman adalah aplikasi untuk membantu petani di Indonesia dalam memprediksi penyakit tungro pada padi.', { type: 'break' }, { type: 'break' }, 'Klik link berikut untuk mendownload aplikasi tanamaman ', { href: 'https://drive.google.com/drive/folders/1Xw7g16SIevxKxDVOrl5R_DXwYfKp1s-n?usp=sharing', text: 'Aplikasi Tanamaman' } ];
+                let partIdx = 0, charIdx = 0; let textNode = document.createTextNode(''); el.appendChild(textNode);
+                function type() { if (partIdx >= parts.length) { setTimeout(() => cursor && (cursor.style.display = 'none'), 900); return; } const part = parts[partIdx]; if (part.type === 'break') { el.appendChild(document.createElement('br')); partIdx++; textNode = document.createTextNode(''); el.appendChild(textNode); return void setTimeout(type, 25); } if (typeof part === 'string') { if (charIdx < part.length) { textNode.textContent += part.charAt(charIdx++); return void setTimeout(type, 25); } else { partIdx++; charIdx = 0; return void setTimeout(type, 25); } } const a = document.createElement('a'); a.href = part.href; a.target = '_blank'; a.rel = 'noopener'; a.textContent = ''; el.appendChild(a); let linkIdx = 0; (function typeLink() { if (linkIdx < part.text.length) { a.textContent += part.text.charAt(linkIdx++); setTimeout(typeLink, 18); } else { partIdx++; charIdx = 0; textNode = document.createTextNode(''); el.appendChild(textNode); setTimeout(type, 18); } })(); } setTimeout(type, 200);
             }
-
-            if (typeof part === 'string') {
-                if (charIdx < part.length) {
-                textNode.textContent += part.charAt(charIdx++);
-                return void setTimeout(type, 25);
-                } else {
-                partIdx++; charIdx = 0;
-                return void setTimeout(type, 25);
-                }
-            }
-
-            const a = document.createElement('a');
-            a.href = part.href; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '';
-            el.appendChild(a);
-
-            let linkIdx = 0;
-            (function typeLink() {
-                if (linkIdx < part.text.length) {
-                a.textContent += part.text.charAt(linkIdx++);
-                setTimeout(typeLink, 18);
-                } else {
-                partIdx++; charIdx = 0;
-                textNode = document.createTextNode('');
-                el.appendChild(textNode);
-                setTimeout(type, 18);
-                }
-            })();
-            }
-
-            setTimeout(type, 200);
-        }
-
-        if (panelEl) {
-            panelEl.addEventListener('shown.bs.modal', runTypewriter);
-        }
+            if (panelEl) { panelEl.addEventListener('shown.bs.modal', runTypewriter); }
         });
     </script>
-
+    <script>
+        // ... (Kode Pie Chart tidak berubah) ...
+        document.addEventListener('DOMContentLoaded', () => {
+            const chartArea = document.querySelector('.chart-area');
+            const backButton = document.getElementById('backButton');
+            if (chartArea && backButton && backButton.parentElement !== chartArea) { chartArea.appendChild(backButton); }
+        });
+        const ctx = document.getElementById('pieChart').getContext('2d');
+        const pieArea = document.getElementById('pieChart').parentElement;
+        const levelLabelEl = document.createElement('div'); levelLabelEl.id = 'pieLevelLabel'; levelLabelEl.className = 'pie-level-badge'; pieArea.appendChild(levelLabelEl);
+        const LEVEL_NAME = { provinsi: 'Provinsi', kabupaten: 'Kabupaten', kecamatan: 'Kecamatan', nama_wilayah: 'Wilayah' };
+        function updatePieLevelLabel(extraText = '') { const name = LEVEL_NAME[currentLevel] || currentLevel; levelLabelEl.textContent = `${name}${extraText ? ' • ' + extraText : ''}`; }
+        let currentLevel = 'provinsi'; let history = []; const backButton = document.getElementById('backButton');
+        const bulanSelect = document.getElementById('filterBulan'); const tahunSelect = document.getElementById('filterTahun'); const pengambilanSelect = document.getElementById('filterPengambilan');
+        const monthsByYear = <?php echo json_encode($monthsByYear, JSON_UNESCAPED_UNICODE); ?>; const monthNames = ['', 'Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+        function rebuildMonthOptions() { const year = parseInt(tahunSelect.value, 10); const list = (monthsByYear[String(year)] || monthsByYear[year]) || []; bulanSelect.innerHTML = ''; if (!list.length) { bulanSelect.disabled = true; return; } bulanSelect.disabled = false; const sorted = list.slice().sort((a,b)=>a-b); const latest = sorted[sorted.length - 1]; for (const m of sorted) { const opt = document.createElement('option'); opt.value = String(m); opt.textContent = monthNames[m] || m; bulanSelect.appendChild(opt); } if (!sorted.includes(parseInt(bulanSelect.value, 10))) { bulanSelect.value = String(latest); } }
+        tahunSelect.addEventListener('change', () => { rebuildMonthOptions(); reloadTopLevel(); });
+        bulanSelect.addEventListener('change', reloadTopLevel); pengambilanSelect.addEventListener('change', reloadTopLevel);
+        rebuildMonthOptions();
+        function reloadTopLevel() { history = []; currentLevel = 'provinsi'; backButton.classList.remove('is-visible'); updatePieLevelLabel(); const postData = `level=provinsi&sumbu=1&bulan=${encodeURIComponent(bulanSelect.value)}&tahun=${encodeURIComponent(tahunSelect.value)}&pengambilan=${encodeURIComponent(pengambilanSelect.value)}`; fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: postData }) .then(r => r.json()) .then(data => { pieChart.data.labels = data.labels || []; pieChart.data.datasets[0].data = data.data || []; pieChart.data.datasets[0].backgroundColor = data.colors || []; pieChart.update(); updatePieLevelLabel(); }) .catch(err => console.error(err)); }
+        let pieChart = new Chart(ctx, { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderColor: ['#ffffff'], borderWidth: 1 }] }, options: { maintainAspectRatio: false, legend: { display: true }, onClick: function (evt, elements) { if (elements.length === 0) return; if (currentLevel === 'nama_wilayah') return; const index = elements[0]._index; const selectedLabel = pieChart.data.labels[index]; history.push({ level: currentLevel, labels: pieChart.data.labels.slice(), data: pieChart.data.datasets[0].data.slice(), colors: pieChart.data.datasets[0].backgroundColor.slice() }); backButton.classList.add('is-visible'); let postData = `sumbu=1&bulan=${encodeURIComponent(bulanSelect.value)}&tahun=${encodeURIComponent(tahunSelect.value)}&pengambilan=${encodeURIComponent(pengambilanSelect.value)}`; if (currentLevel === 'provinsi') { postData += `&provinsi=${encodeURIComponent(selectedLabel)}`; currentLevel = 'kabupaten'; } else if (currentLevel === 'kabupaten') { postData += `&kabupaten=${encodeURIComponent(selectedLabel)}`; currentLevel = 'kecamatan'; } else if (currentLevel === 'kecamatan') { postData += `&kecamatan=${encodeURIComponent(selectedLabel)}`; currentLevel = 'nama_wilayah'; } updatePieLevelLabel(); fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: postData }) .then(response => response.json()) .then(data => { pieChart.data.labels = data.labels || []; pieChart.data.datasets[0].data = data.data || []; pieChart.data.datasets[0].backgroundColor = data.colors || []; pieChart.update(); }) .catch(error => console.error('Error:', error)); } } });
+        reloadTopLevel();
+        backButton.addEventListener('click', function () { if (history.length > 0) { const previousState = history.pop(); currentLevel = previousState.level; pieChart.data.labels = previousState.labels; pieChart.data.datasets[0].data = previousState.data; pieChart.data.datasets[0].backgroundColor = previousState.colors; pieChart.update(); updatePieLevelLabel(); if (history.length === 0) { backButton.classList.remove('is-visible'); } } else { console.log("Tidak ada data sebelumnya untuk kembali."); } });
+    </script>
+    <script>
+        // ... (Kode Map/Leaflet tidak berubah) ...
+        (function(){
+            const provSelect = document.getElementById('filterProvinsi'); const sevSelect = document.getElementById('filterSeverity'); const bulanSelect = document.getElementById('filterBulan'); const tahunSelect = document.getElementById('filterTahun'); const pengambilanSelect = document.getElementById('filterPengambilan'); const statPanel = document.getElementById('statPanel');
+            const map = L.map('mapTungro', { worldCopyJump: true, inertia: true, inertiaDeceleration: 3000, }); const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}); osm.addTo(map); const indoBounds = L.latLngBounds([[-11.2, 95.0], [6.2, 141.0]]); map.fitBounds(indoBounds, { animate: false }); map.setMaxBounds(indoBounds.pad(0.05)); map.setMinZoom(3); map.setMaxZoom(19); map.on('drag', () => map.panInsideBounds(indoBounds, { animate: true }));
+            let currentMapLevel = null; let geojsonData = null; let gjLayer = null; let zoomLock = false; let zoomChangeTimer = null;
+            function getColor(d) { return d > 50 ? '#9B1D3A' : d > 30 ? '#C12F38' : d > 10 ? '#E8765D' : d > 0 ? '#E4C98B' : '#58E26F'; } function style(feature){ const inc = feature?.properties?.stats?.incidence_pct ?? 0; return { weight:1, opacity:1, color:'#ffffff', dashArray:'3', fillOpacity:0.75, fillColor:getColor(inc) }; }
+            const legend = L.control({ position: 'bottomright' }); legend.onAdd = function () { const div = L.DomUtil.create('div', 'legend'); const items = [ { label: '0%', sample: 0 }, { label: '1–10%', sample: 1 }, { label: '>10–30%', sample: 11 }, { label: '>30–50%', sample: 31 }, { label: '≥50%', sample: 51 } ]; let html = '<div class="mb-1"><b>Insidensi (%)</b></div>'; items.forEach(it => { html += `<div><i style="background:${getColor(it.sample)}"></i> ${it.label}</div>`; }); div.innerHTML = html; return div; }; legend.addTo(map);
+            function severityMatch(inc, sevVal){ if(!sevVal) return true; if(sevVal==='0') return inc == 0; if(sevVal==='1-10') return inc > 0 && inc <= 10; if(sevVal==='10-30') return inc > 10 && inc <= 30; if(sevVal==='30-50') return inc > 30 && inc <= 50; if(sevVal==='50+') return inc > 50; return true; }
+            function showStatsForFeature(f){ const p = f.properties || {}; const s = p.stats || {}; const name = p.kecamatan || p.kabupaten || p.provinsi || '(tanpa nama)'; const virLabel = s.virulensi || '-'; const vars = s.varietas || {}; const rentan = Number(vars.Rentan ?? vars.rentan ?? 0); const tahan = Number(vars.Tahan ?? vars.tahan ?? 0); const total = rentan + tahan; const rDisp = rentan.toFixed(1); const tDisp = tahan.toFixed(1); const rWidth = total ? (rentan/total)*100 : 0; const tWidth = total ? (tahan /total)*100 : 0; const varietasHTML = total === 0 ? `<div class="text-muted">-</div>` : ` <div class="d-flex justify-content-between small mb-1"> <span>Varietas</span> <span>Rentan ${rDisp}% • Tahan ${tDisp}%</span> </div> <div class="progress" style="height:20px;"> <div class="progress-bar bg-warning" role="progressbar" style="width:${rWidth}%;">Rentan ${rDisp}%</div> <div class="progress-bar bg-success" role="progressbar" style="width:${tWidth}%;">Tahan ${tDisp}%</div> </div>`; statPanel.innerHTML = ` <h6 class="mb-2"><b>${name}</b> — Rata-rata Insidensi: <b>${s.incidence_pct ?? 0}%</b></h6> <table class="table table-sm mb-2"> <tbody> <tr><td>Rata-rata Populasi Wereng</td><td class="text-end">${s.mean_populasi_wereng ?? '-'}</td></tr> <tr><td>Rata-rata Suhu</td><td class="text-end">${s.mean_suhu ?? '-'} ℃</td></tr> <tr><td>Rata-rata Presipitasi</td><td class="text-end">${s.mean_presipitasi ?? '-'} mm</td></tr> <tr><td>Virulensi</td><td class="text-end">${virLabel}</td></tr> </tbody> </table> ${varietasHTML} `; }
+            function onEachFeature(feature, layer){ const p = feature.properties || {}; const name = p.kecamatan || p.kabupaten || p.provinsi || '(tanpa nama)'; const inc = p.stats?.incidence_pct ?? 0; const vlab = p.stats?.virulensi ? `<br>Virulensi: <b>${p.stats.virulensi}</b>` : ''; layer.bindTooltip(`${name}<br>Insidensi: <b>${inc}%</b>${vlab}`, {sticky:true}); layer.on({ mouseover: e => { const l = e.target; l.setStyle({weight:2, color:'#666', dashArray:'', fillOpacity:0.85}); l.bringToFront(); }, mouseout : e => { gjLayer && gjLayer.resetStyle(e.target); }, click: e => { const bounds = e.target.getBounds(); zoomLock = true; map.flyToBounds(bounds, { padding:[20,20], duration:0.35 }); showStatsForFeature(e.target.feature); setTimeout(() => { zoomLock = false; handleZoomChange(); }, 380); } }); }
+            function applyLayer(opts = {}) { const preserveView = !!opts.preserveView; if (gjLayer) { map.removeLayer(gjLayer); gjLayer = null; } if (!geojsonData) return; const selectedProv = provSelect.value; const selectedSev = sevSelect.value; const filtered = { type: 'FeatureCollection', features: (geojsonData.features || []).filter(f => { const p = f.properties || {}; const inc = p.stats?.incidence_pct ?? 0; const provOk = !selectedProv || (p.provinsi === selectedProv); const sevOk = severityMatch(inc, selectedSev); return provOk && sevOk; }) }; if (!filtered.features.length) { statPanel.innerHTML = `<div class="alert alert-warning mb-0">Tidak ada area yang cocok dengan filter.</div>`; if (!opts.preserveView) { try { map.fitBounds(indoBounds, { animate: true, padding:[20,20] }); } catch(e){} } return; } gjLayer = L.geoJSON(filtered, { style, onEachFeature }); gjLayer.addTo(map); if (!preserveView) { try { map.fitBounds(gjLayer.getBounds(), { padding:[20,20], animate:false }); } catch(e){} } showStatsForFeature(filtered.features[0]); }
+            function decideLevelByZoom(){ const z = map.getZoom(); const minZ = map.getMinZoom() ?? 0; const maxZ = map.getMaxZoom() ?? (osm.options.maxZoom ?? 19); const pct = Math.max(0, Math.min(100, ((z - minZ) / (maxZ - minZ)) * 100)); if (pct < 30) return 'provinsi'; if (pct < 40) return 'kabupaten'; return 'kecamatan'; }
+            let loading = false; async function loadGeoByLevel(level, opts = {}) { if (loading) return; loading = true; currentMapLevel = level; const body = new URLSearchParams({ level: level, bulan: bulanSelect ? (bulanSelect.value || '') : '', tahun: tahunSelect ? (tahunSelect.value || '') : '', pengambilan: pengambilanSelect ? (pengambilanSelect.value || '') : '', filter_provinsi: provSelect ? (provSelect.value || '') : '' }); try { const resp = await fetch('map_api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() }); const json = await resp.json(); geojsonData = json.geojson || {type:'FeatureCollection',features:[]}; applyLayer({ preserveView: !!opts.preserveView }); } catch (e) { console.error(e); } finally { loading = false; } }
+            async function refreshFilters(opts = { reload: true }) { const prevProv = provSelect.value || ''; const prevSev = sevSelect.value || ''; const body = new URLSearchParams({ act: 'filters', bulan: bulanSelect ? (bulanSelect.value || '') : '', tahun: tahunSelect ? (tahunSelect.value || '') : '', pengambilan: pengambilanSelect ? (pengambilanSelect.value || '') : '' }); try { const resp = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() }); const json = await resp.json(); provSelect.innerHTML = ''; const optAllProv = document.createElement('option'); optAllProv.value = ''; optAllProv.textContent = 'Semua Provinsi'; provSelect.appendChild(optAllProv); (json.provinsi || []).forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; provSelect.appendChild(o); }); if (prevProv && (json.provinsi || []).includes(prevProv)) { provSelect.value = prevProv; } else { provSelect.value = ''; } const labelMap = { '0' : '0% (Tidak Ada Insidensi)', '1-10' : '1–10% (Ringan)', '10-30' : '>10–30% (Sedang)', '30-50' : '>30–50% (Berat)', '50+' : '≥50% (Sangat Berat)' }; sevSelect.innerHTML = ''; const optAllSev = document.createElement('option'); optAllSev.value = ''; optAllSev.textContent = 'Semua Keparahan'; sevSelect.appendChild(optAllSev); (json.severity || []).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = labelMap[k] || k; sevSelect.appendChild(o); }); if (prevSev && (json.severity || []).includes(prevSev)) { sevSelect.value = prevSev; } else { sevSelect.value = ''; } if (opts.reload) { loadGeoByLevel(currentMapLevel || 'provinsi', { preserveView: true }); } } catch (e) { console.error('refreshFilters failed', e); } }
+            sevSelect.addEventListener('change', () => applyLayer({ preserveView: true })); provSelect.addEventListener('change', () => { loadGeoByLevel(currentMapLevel || 'provinsi', { preserveView: false }); });
+            if (bulanSelect) bulanSelect.addEventListener('change', () => { refreshFilters({ reload: true }); }); if (tahunSelect) tahunSelect.addEventListener('change', () => { refreshFilters({ reload: true }); }); if (pengambilanSelect) pengambilanSelect.addEventListener('change', () => { refreshFilters({ reload: true }); });
+            refreshFilters({ reload: false }).then(() => { loadGeoByLevel(decideLevelByZoom(), { preserveView: false }); });
+            function handleZoomChange(){ if (zoomLock) return; if (zoomChangeTimer) clearTimeout(zoomChangeTimer); zoomChangeTimer = setTimeout(() => { const desired = decideLevelByZoom(); if (desired !== currentMapLevel) { loadGeoByLevel(desired, { preserveView: true }); } }, 120); } map.on('zoomend', handleZoomChange);
+        })();
+    </script>
+    <script>
+        // ... (Kode Gauge Chart tidak berubah) ...
+        (function(){
+            const gaugeEl = document.getElementById('apiGauge'); if(!gaugeEl) return;
+            const pct = Number(gaugeEl.dataset.percent || 0); const stepsText = gaugeEl.dataset.steps || ''; const value = Math.max(0, Math.min(100, pct)); const data = [value, 100 - value];
+            const filledColor = 'rgba(54, 162, 235, 1)'; const emptyColor = 'rgba(230, 236, 245, .9)';
+            const ctxGauge = gaugeEl.getContext('2d'); new Chart(ctxGauge, { type: 'doughnut', data: { labels: ['Terpakai','Sisa'], datasets: [{ data: data, backgroundColor: [filledColor, emptyColor], borderWidth: 0 }] }, options: { maintainAspectRatio: false, cutoutPercentage: 75, rotation: Math.PI, circumference: Math.PI, legend: { display: false }, tooltips: { enabled: false }, animation: { animateRotate: true, duration: 700 } } });
+            const pctLabel = document.querySelector('.gauge-percent'); const stepLabel = document.querySelector('.gauge-steps'); if (pctLabel) pctLabel.textContent = value.toFixed(1) + '%'; if (stepLabel) stepLabel.textContent = stepsText;
+        })();
+    </script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-        const chartArea = document.querySelector('.chart-area');
-        const backButton = document.getElementById('backButton');
-        if (chartArea && backButton && backButton.parentElement !== chartArea) {
-            chartArea.appendChild(backButton);
-        }
-        });
-            const ctx = document.getElementById('pieChart').getContext('2d');
-            const pieArea = document.getElementById('pieChart').parentElement;
+            // ======================================================
+            // == HELPER MODAL ALERT & KONFIRMASI KUSTOM ==
+            // ======================================================
+            
+            // --- Alert ---
+            const customAlertModalEl = document.getElementById('customAlertModal');
+            const customAlertModal = customAlertModalEl ? new bootstrap.Modal(customAlertModalEl) : null;
+            const customAlertMessageEl = document.getElementById('customAlertMessage');
+            let alertQueue = []; 
+            let isAlertShowing = false;
+            let currentAlertOnHiddenCallback = null; 
 
-            const levelLabelEl = document.createElement('div');
-            levelLabelEl.id = 'pieLevelLabel';
-            levelLabelEl.className = 'pie-level-badge';
-            pieArea.appendChild(levelLabelEl);
-
-            const LEVEL_NAME = {
-                provinsi: 'Provinsi',
-                kabupaten: 'Kabupaten',
-                kecamatan: 'Kecamatan',
-                nama_wilayah: 'Wilayah'
-            };
-
-            // fungsi update teks label
-            function updatePieLevelLabel(extraText = '') {
-                const name = LEVEL_NAME[currentLevel] || currentLevel;
-                levelLabelEl.textContent = `${name}${extraText ? ' • ' + extraText : ''}`;
+            function showCustomAlert(message, type = 'error', onHiddenCallback = null) {
+                if (!customAlertModal || !customAlertMessageEl) {
+                    console.warn('Custom alert modal not found. Falling back to native alert.');
+                    alert(message);
+                    if (onHiddenCallback) onHiddenCallback();
+                    return;
+                }
+                let fullMessage = (type === 'error' ? '' : (type === 'success' ? 'Sukses: ' : 'Info: ')) + message;
+                alertQueue.push({ message: fullMessage, onHidden: onHiddenCallback });
+                if (!isAlertShowing) { showNextAlert(); }
             }
-            let currentLevel = 'provinsi'; // Level awal: provinsi
-            let history = []; // Menyimpan riwayat data sebelumnya untuk fungsi Back
-
-            const backButton = document.getElementById('backButton');
-
-            const bulanSelect = document.getElementById('filterBulan');
-            const tahunSelect = document.getElementById('filterTahun');
-            const pengambilanSelect = document.getElementById('filterPengambilan');
-
-            const monthsByYear = <?php echo json_encode($monthsByYear, JSON_UNESCAPED_UNICODE); ?>;
-            const monthNames = ['', 'Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-
-            function rebuildMonthOptions() {
-                const year = parseInt(tahunSelect.value, 10);
-                const list = (monthsByYear[String(year)] || monthsByYear[year]) || [];
-                bulanSelect.innerHTML = '';
-
-                if (!list.length) {
-                bulanSelect.disabled = true;
-                return;
-                }
-                bulanSelect.disabled = false;
-
-                // urutkan ASC, lalu auto-pilih yang terbaru (max)
-                const sorted = list.slice().sort((a,b)=>a-b);
-                const latest = sorted[sorted.length - 1];
-
-                for (const m of sorted) {
-                const opt = document.createElement('option');
-                opt.value = String(m);
-                opt.textContent = monthNames[m] || m;
-                bulanSelect.appendChild(opt);
-                }
-
-                // Jika value sebelumnya tidak valid, pilih bulan terbaru
-                if (!sorted.includes(parseInt(bulanSelect.value, 10))) {
-                bulanSelect.value = String(latest);
-                }
+            
+            function showNextAlert() {
+                if (alertQueue.length === 0) { isAlertShowing = false; return; }
+                isAlertShowing = true;
+                const item = alertQueue.shift(); 
+                customAlertMessageEl.textContent = item.message;
+                currentAlertOnHiddenCallback = item.onHidden; 
+                customAlertModal.show();
             }
 
-            // Saat Tahun berubah → rebuild bulan & reload chart
-            tahunSelect.addEventListener('change', () => {
-                rebuildMonthOptions();
-                reloadTopLevel();
-            });
-
-            // Bulan berubah → reload chart
-            bulanSelect.addEventListener('change', reloadTopLevel);
-            // Saat Pengambilan Data berubah -> reload chart
-            pengambilanSelect.addEventListener('change', reloadTopLevel);
-
-            // Sinkronkan dropdown pada load pertama (jaga-jaga)
-            rebuildMonthOptions();
-
-            // fungsi muat ulang top-level (Provinsi) sesuai filter
-            function reloadTopLevel() {
-                // bersihkan history & kembali ke level provinsi
-                history = [];
-                currentLevel = 'provinsi';
-                backButton.classList.remove('is-visible');
-
-                updatePieLevelLabel();
-                const postData = `level=provinsi&sumbu=1&bulan=${encodeURIComponent(bulanSelect.value)}&tahun=${encodeURIComponent(tahunSelect.value)}&pengambilan=${encodeURIComponent(pengambilanSelect.value)}`;
-
-                fetch('api.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: postData
-                })
-                .then(r => r.json())
-                .then(data => {
-                    pieChart.data.labels = data.labels || [];
-                    pieChart.data.datasets[0].data = data.data || [];
-                    pieChart.data.datasets[0].backgroundColor = data.colors || [];
-                    pieChart.update();
-                    updatePieLevelLabel();
-                })
-                .catch(err => console.error(err));
-                }
-
-
-                let pieChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: [],
-                    datasets: [{
-                    data: [],
-                    backgroundColor: [],
-                    borderColor: ['#ffffff'],
-                    borderWidth: 1
-                    }]
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    legend: { display: true },
-                    onClick: function (evt, elements) {
-                    if (elements.length === 0) return;
-                    if (currentLevel === 'nama_wilayah') return;
-
-                    const index = elements[0]._index;
-                    const selectedLabel = pieChart.data.labels[index];
-
-                    history.push({
-                        level: currentLevel,
-                        labels: pieChart.data.labels.slice(),
-                        data: pieChart.data.datasets[0].data.slice(),
-                        colors: pieChart.data.datasets[0].backgroundColor.slice()
+            if (customAlertModalEl) {
+                // Gunakan class unik untuk tombol close alert
+                const alertCloseButton = customAlertModalEl.querySelector('.custom-alert-close-btn');
+                if (alertCloseButton) {
+                    alertCloseButton.addEventListener('click', () => {
+                        // Tidak perlu lakukan apa-apa di sini, biarkan event hidden.bs.modal yang handle
                     });
+                }
 
-                    backButton.classList.add('is-visible');
+                customAlertModalEl.addEventListener('hidden.bs.modal', () => {
+                    isAlertShowing = false;
+                    if (currentAlertOnHiddenCallback) {
+                        currentAlertOnHiddenCallback();
+                        currentAlertOnHiddenCallback = null; 
+                    }
+                    if (alertQueue.length > 0) {
+                        setTimeout(showNextAlert, 50); // Jeda sedikit agar tidak langsung tumpang tindih
+                    }
+                });
+            }
 
-                    let postData = `sumbu=1&bulan=${encodeURIComponent(bulanSelect.value)}&tahun=${encodeURIComponent(tahunSelect.value)}&pengambilan=${encodeURIComponent(pengambilanSelect.value)}`;
+            // --- Confirm ---
+            const customConfirmModalEl = document.getElementById('customConfirmModal');
+            const customConfirmModal = customConfirmModalEl ? new bootstrap.Modal(customConfirmModalEl) : null;
+            const customConfirmMessageEl = document.getElementById('customConfirmMessage');
+            const customConfirmYesBtn = document.getElementById('customConfirmYesBtn');
+            const customConfirmNoBtn = document.getElementById('customConfirmNoBtn');
+            let currentConfirmResolve = null; // Menyimpan fungsi resolve dari Promise
 
-                    if (currentLevel === 'provinsi') {
-                        postData += `&provinsi=${encodeURIComponent(selectedLabel)}`;
-                        currentLevel = 'kabupaten';
-                    } else if (currentLevel === 'kabupaten') {
-                        postData += `&kabupaten=${encodeURIComponent(selectedLabel)}`;
-                        currentLevel = 'kecamatan';
-                    } else if (currentLevel === 'kecamatan') {
-                        postData += `&kecamatan=${encodeURIComponent(selectedLabel)}`;
-                        currentLevel = 'nama_wilayah';
+            /**
+             * Menampilkan konfirmasi kustom menggunakan Promise.
+             * @param {string} message Pesan konfirmasi.
+             * @returns {Promise<boolean>} Promise yang resolve ke true jika "Ya" diklik, false jika "Tidak" diklik.
+             */
+            function showCustomConfirm(message) {
+                return new Promise((resolve) => {
+                    if (!customConfirmModal || !customConfirmMessageEl || !customConfirmYesBtn || !customConfirmNoBtn) {
+                        console.warn('Custom confirm modal elements not found. Falling back to native confirm.');
+                        resolve(confirm(message)); // Fallback ke confirm bawaan
+                        return;
                     }
 
-                    updatePieLevelLabel();
+                    // Simpan fungsi resolve untuk digunakan nanti
+                    currentConfirmResolve = resolve; 
 
-                    fetch('api.php', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: postData
-                    })
+                    customConfirmMessageEl.textContent = message;
+                    customConfirmModal.show();
+                });
+            }
+
+            // Tambahkan listener HANYA SEKALI saat setup
+            if (customConfirmYesBtn) {
+                customConfirmYesBtn.addEventListener('click', () => {
+                    if (currentConfirmResolve) {
+                        currentConfirmResolve(true); // Resolve promise dengan true
+                        currentConfirmResolve = null; // Reset
+                    }
+                    customConfirmModal.hide();
+                });
+            }
+            if (customConfirmNoBtn) {
+                customConfirmNoBtn.addEventListener('click', () => {
+                    if (currentConfirmResolve) {
+                        currentConfirmResolve(false); // Resolve promise dengan false
+                        currentConfirmResolve = null; // Reset
+                    }
+                    customConfirmModal.hide();
+                });
+            }
+            // Event listener saat modal ditutup (misal klik backdrop atau escape) dianggap 'Tidak'
+            if (customConfirmModalEl) {
+                 customConfirmModalEl.addEventListener('hidden.bs.modal', () => {
+                    if (currentConfirmResolve) { // Jika masih ada resolve (belum klik Ya/Tidak)
+                        currentConfirmResolve(false); // Anggap "Tidak"
+                        currentConfirmResolve = null; // Reset
+                    }
+                });
+            }
+
+            // ======================================================
+            // == AKHIR HELPER MODAL ==
+            // ======================================================
+
+
+            const userIsLoggedIn = <?php echo json_encode(isset($_SESSION['user_id'])); ?>;
+            const userIsAdmin    = <?php echo json_encode(isset($_SESSION['status']) && $_SESSION['status'] === 'admin'); ?>;
+
+            const loginModalEl    = document.getElementById('loginModal');
+            const loginModal      = loginModalEl ? new bootstrap.Modal(loginModalEl) : null;
+            const curationModalEl = document.getElementById('curationModal');
+            const curationModal   = curationModalEl ? new bootstrap.Modal(curationModalEl) : null;
+            const registerModalEl = document.getElementById('registerModal');
+            const registerModal = registerModalEl ? new bootstrap.Modal(registerModalEl) : null;
+
+            let curationPage = 1; let curationSort = 'tanggal_input'; let curationDir  = 'DESC'; 
+            const curationInfoEl = document.getElementById('curationInfo'); const curationPaginationEl = document.getElementById('curationPagination');
+            function setSortIndicator() { document.querySelectorAll('#curationTable thead th.sortable .sort-indicator').forEach(el => el.textContent = ''); const activeTh = document.querySelector(`#curationTable thead th.sortable[data-sort="${curationSort}"] .sort-indicator`); if (activeTh) activeTh.textContent = (curationDir === 'ASC' ? '▲' : '▼'); }
+            function buildPagination(totalPages, current) { /* ... (fungsi buildPagination tidak berubah) ... */ curationPaginationEl.innerHTML = ''; if (totalPages <= 1) return; function addItem(label, page, disabled=false, active=false) { const li = document.createElement('li'); li.className = `page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}`; const a = document.createElement('a'); a.className = 'page-link'; a.href = '#'; a.textContent = label; a.addEventListener('click', (e) => { e.preventDefault(); if (disabled || active) return; curationPage = page; loadCurationData(); }); li.appendChild(a); curationPaginationEl.appendChild(li); } addItem('«', 1, current === 1); addItem('‹', Math.max(1, current - 1), current === 1); const windowSize = 7; let start = Math.max(1, current - Math.floor(windowSize/2)); let end = Math.min(totalPages, start + windowSize - 1); if (end - start + 1 < windowSize) start = Math.max(1, end - windowSize + 1); for (let p = start; p <= end; p++) { addItem(String(p), p, false, p === current); } addItem('›', Math.min(totalPages, current + 1), current === totalPages); addItem('»', totalPages, current === totalPages); }
+
+            const openLoginBtn = document.getElementById('openLoginBtn'); if (openLoginBtn) { openLoginBtn.addEventListener('click', () => { loginModal?.show(); }); }
+            const openCurationBtn = document.getElementById('openCurationPanel'); if (openCurationBtn) { openCurationBtn.addEventListener('click', () => { if (!userIsLoggedIn) { showCustomAlert('Anda harus login.', 'error'); loginModal?.show(); return; } if (!userIsAdmin) { showCustomAlert('Hanya admin yang dapat mengakses menu verifikasi data.', 'error'); return; } loadCurationData(); curationModal?.show(); }); }
+            
+            const openRegFromLogin = document.getElementById('openRegisterFromLogin');
+            if (openRegFromLogin && loginModal && registerModal) {
+                 openRegFromLogin.addEventListener('click', (e) => { e.preventDefault(); loginModal.hide(); registerModal.show(); });
+            }
+            const openLoginFromReg = document.getElementById('openLoginFromRegister');
+             if (openLoginFromReg && loginModal && registerModal) {
+                openLoginFromReg.addEventListener('click', (e) => { e.preventDefault(); registerModal.hide(); loginModal.show(); });
+             }
+
+            const loginForm = document.getElementById('loginForm');
+             if (loginForm && loginModal) {
+                loginForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const email = document.getElementById('loginEmail').value;
+                    const password = document.getElementById('loginPassword').value;
+                    const submitButton = e.target.querySelector('button[type="submit"]');
+                    submitButton.disabled = true; submitButton.textContent = 'Memproses...';
+                    fetch('login_process.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, password: password }) })
                     .then(response => response.json())
                     .then(data => {
-                        pieChart.data.labels = data.labels || [];
-                        pieChart.data.datasets[0].data = data.data || [];
-                        pieChart.data.datasets[0].backgroundColor = data.colors || [];
-                        pieChart.update();
+                        if (data.success) { 
+                            showCustomAlert(data.message, 'success', () => { window.location.reload(); }); 
+                        } else { 
+                            showCustomAlert(data.message, 'error'); 
+                        }
                     })
-                    .catch(error => console.error('Error:', error));
-                    }
-                }
-            });
-
-            reloadTopLevel();
-
-            backButton.addEventListener('click', function () {
-                if (history.length > 0) {
-                    const previousState = history.pop(); // Ambil data sebelumnya
-                    currentLevel = previousState.level; // Kembali ke level sebelumnya
-                    pieChart.data.labels = previousState.labels;
-                    pieChart.data.datasets[0].data = previousState.data;
-                    pieChart.data.datasets[0].backgroundColor = previousState.colors;
-                    pieChart.update();
-
-                    updatePieLevelLabel();
-
-                    // Sembunyikan tombol Back jika tidak ada history
-                    if (history.length === 0) {
-                        backButton.classList.remove('is-visible');
-                    }
-                } else {
-                    console.log("Tidak ada data sebelumnya untuk kembali.");
-                }
-            });
-
-        </script>
-    
-    <script>
-        (function(){
-        const provSelect   = document.getElementById('filterProvinsi');
-        const sevSelect    = document.getElementById('filterSeverity');
-        const bulanSelect  = document.getElementById('filterBulan');
-        const tahunSelect  = document.getElementById('filterTahun');
-        const pengambilanSelect = document.getElementById('filterPengambilan');
-        const statPanel    = document.getElementById('statPanel');
-
-        // ====== Setup Map ======
-        const map = L.map('mapTungro', { 
-            worldCopyJump: true,        // biar mulus saat nyebrang 180° lon/garis tanggal
-            inertia: true,
-            inertiaDeceleration: 3000,  // gesekan inersia nyaman (opsional)
-        });
-        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19});
-        osm.addTo(map);
-
-        const indoBounds = L.latLngBounds([[-11.2, 95.0], [6.2, 141.0]]);
-        map.fitBounds(indoBounds, { animate: false });
-        map.setMaxBounds(indoBounds.pad(0.05));
-        map.setMinZoom(3);
-        map.setMaxZoom(19);
-        map.on('drag', () => map.panInsideBounds(indoBounds, { animate: true }));
-
-        // ====== State ======
-        let currentMapLevel = null;     // 'provinsi' | 'kabupaten' | 'kecamatan'
-        let geojsonData     = null;     // FeatureCollection dari server
-        let gjLayer         = null;
-
-        let zoomLock = false;           // kunci sementara agar zoomend diabaikan
-        let zoomChangeTimer = null;     // debounce zoomend
-        
-        // ====== Util warna insidensi ======
-        function getColor(d) {
-            return d > 50 ? '#9B1D3A' :
-                d > 30 ? '#C12F38' :
-                d > 10 ? '#E8765D' :
-                d >  0 ? '#E4C98B' : '#58E26F';
-        }
-        function style(feature){
-            const inc = feature?.properties?.stats?.incidence_pct ?? 0;
-            return { weight:1, opacity:1, color:'#ffffff', dashArray:'3', fillOpacity:0.75, fillColor:getColor(inc) };
-        }
-        
-        const legend = L.control({ position: 'bottomright' });
-        legend.onAdd = function () {
-        const div = L.DomUtil.create('div', 'legend');
-
-        // urutannya disesuaikan dengan threshold getColor()
-        const items = [
-            { label: '0%',        sample: 0   },
-            { label: '1–10%',     sample: 1   },
-            { label: '>10–30%',   sample: 11  },
-            { label: '>30–50%',   sample: 31  },
-            { label: '≥50%',      sample: 51  }
-        ];
-
-        let html = '<div class="mb-1"><b>Insidensi (%)</b></div>';
-        items.forEach(it => {
-            html += `<div><i style="background:${getColor(it.sample)}"></i> ${it.label}</div>`;
-        });
-
-        div.innerHTML = html;
-        return div;
-        };
-        legend.addTo(map);
-
-        // ====== UI: severity range match ======
-        function severityMatch(inc, sevVal){
-            if(!sevVal) return true;
-            if(sevVal==='0')     return inc == 0;
-            if(sevVal==='1-10')  return inc > 0 && inc <= 10;
-            if(sevVal==='10-30') return inc > 10 && inc <= 30;
-            if(sevVal==='30-50') return inc > 30 && inc <= 50;
-            if(sevVal==='50+')   return inc > 50;
-            return true;
-        }
-
-        // ====== Panel statistik ======
-        function showStatsForFeature(f){
-            const p = f.properties || {};
-            const s = p.stats || {};
-            // Tentukan nama tampil sesuai level (atau fallback)
-            const name = p.kecamatan || p.kabupaten || p.provinsi || '(tanpa nama)';
-            const virLabel = s.virulensi || '-';
-            const vars = s.varietas || {};
-            const rentan = Number(vars.Rentan ?? vars.rentan ?? 0);
-            const tahan  = Number(vars.Tahan  ?? vars.tahan  ?? 0);
-            const total  = rentan + tahan;
-            const rDisp  = rentan.toFixed(1);
-            const tDisp  = tahan.toFixed(1);
-            const rWidth = total ? (rentan/total)*100 : 0;
-            const tWidth = total ? (tahan /total)*100 : 0;
-
-            const varietasHTML = total === 0
-            ? `<div class="text-muted">-</div>`
-            : `
-                <div class="d-flex justify-content-between small mb-1">
-                <span>Varietas</span>
-                <span>Rentan ${rDisp}% • Tahan ${tDisp}%</span>
-                </div>
-                <div class="progress" style="height:20px;">
-                <div class="progress-bar bg-warning" role="progressbar" style="width:${rWidth}%;">Rentan ${rDisp}%</div>
-                <div class="progress-bar bg-success" role="progressbar" style="width:${tWidth}%;">Tahan ${tDisp}%</div>
-                </div>`;
-
-            statPanel.innerHTML = `
-            <h6 class="mb-2"><b>${name}</b> — Rata-rata Insidensi: <b>${s.incidence_pct ?? 0}%</b></h6>
-            <table class="table table-sm mb-2">
-                <tbody>
-                <tr><td>Rata-rata Populasi Wereng</td><td class="text-end">${s.mean_populasi_wereng ?? '-'}</td></tr>
-                <tr><td>Rata-rata Suhu</td><td class="text-end">${s.mean_suhu ?? '-'} ℃</td></tr>
-                <tr><td>Rata-rata Presipitasi</td><td class="text-end">${s.mean_presipitasi ?? '-'} mm</td></tr>
-                <tr><td>Virulensi</td><td class="text-end">${virLabel}</td></tr>
-                </tbody>
-            </table>
-            ${varietasHTML}
-            `;
-        }
-
-        function onEachFeature(feature, layer){
-            const p = feature.properties || {};
-            const name = p.kecamatan || p.kabupaten || p.provinsi || '(tanpa nama)';
-            const inc  = p.stats?.incidence_pct ?? 0;
-            const vlab = p.stats?.virulensi ? `<br>Virulensi: <b>${p.stats.virulensi}</b>` : '';
-            layer.bindTooltip(`${name}<br>Insidensi: <b>${inc}%</b>${vlab}`, {sticky:true});
-            layer.on({
-            mouseover: e => { const l = e.target; l.setStyle({weight:2, color:'#666', dashArray:'', fillOpacity:0.85}); l.bringToFront(); },
-            mouseout : e => { gjLayer && gjLayer.resetStyle(e.target); },
-            click: e => {
-                const bounds = e.target.getBounds();
-                zoomLock = true;
-                map.flyToBounds(bounds, { padding:[20,20], duration:0.35 });
-                showStatsForFeature(e.target.feature);
-                setTimeout(() => { zoomLock = false; handleZoomChange(); }, 380);
-            }
-            });
-        }
-
-        // ====== Render layer dari geojsonData + filter UI ======
-        function applyLayer(opts = {}) {
-            const preserveView = !!opts.preserveView;
-
-            if (gjLayer) { map.removeLayer(gjLayer); gjLayer = null; }
-            if (!geojsonData) return;
-
-            const selectedProv = provSelect.value;
-            const selectedSev  = sevSelect.value;
-
-            const filtered = {
-                type: 'FeatureCollection',
-                features: (geojsonData.features || []).filter(f => {
-                const p = f.properties || {};
-                const inc = p.stats?.incidence_pct ?? 0;
-                const provOk = !selectedProv || (p.provinsi === selectedProv);
-                const sevOk  = severityMatch(inc, selectedSev);
-                return provOk && sevOk;
-                })
-            };
-
-            if (!filtered.features.length) {
-                statPanel.innerHTML = `<div class="alert alert-warning mb-0">Tidak ada area yang cocok dengan filter.</div>`;
-                if (!opts.preserveView) {
-                    try { map.fitBounds(indoBounds, { animate: true, padding:[20,20] }); } catch(e){}
-                }
-                return;
-            }
-
-
-            gjLayer = L.geoJSON(filtered, { style, onEachFeature });
-            gjLayer.addTo(map);
-
-            // Hanya fitBounds saat BUKAN ganti level (misal load awal / user apply filter berat)
-            if (!preserveView) {
-                try { map.fitBounds(gjLayer.getBounds(), { padding:[20,20], animate:false }); } catch(e){}
-            }
-
-            // tampilkan stats pertama
-            showStatsForFeature(filtered.features[0]);
-        }
-
-
-        // ====== Hitung level dari persentase zoom ======
-        function decideLevelByZoom(){
-            const z    = map.getZoom();
-            const minZ = map.getMinZoom() ?? 0;
-            const maxZ = map.getMaxZoom() ?? (osm.options.maxZoom ?? 19);
-            const pct  = Math.max(0, Math.min(100, ((z - minZ) / (maxZ - minZ)) * 100));
-            if (pct < 30) return 'provinsi';
-            if (pct < 40) return 'kabupaten';
-            return 'kecamatan';
-        }
-
-
-        // ====== Load data dari server sesuai level ======
-        let loading = false;
-        async function loadGeoByLevel(level, opts = {}) {
-            if (loading) return;
-            loading = true;
-            currentMapLevel = level;
-            
-            // -- Sertakan semua filter saat memuat data peta --
-            const body = new URLSearchParams({
-                level: level,
-                bulan: bulanSelect ? (bulanSelect.value || '') : '',
-                tahun: tahunSelect ? (tahunSelect.value || '') : '',
-                pengambilan: pengambilanSelect ? (pengambilanSelect.value || '') : '', // <-- Tambahkan ini
-                filter_provinsi: provSelect ? (provSelect.value || '') : ''
-            });
-
-            try {
-                const resp = await fetch('map_api.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: body.toString()
+                    .catch(error => { console.error('Error:', error); showCustomAlert('Terjadi kesalahan koneksi.', 'error'); })
+                    .finally(() => { submitButton.disabled = false; submitButton.textContent = 'Login'; });
                 });
-                const json = await resp.json();
-                geojsonData = json.geojson || {type:'FeatureCollection',features:[]};
-                // saat ganti level → preserveView=true untuk hindari bounce
-                applyLayer({ preserveView: !!opts.preserveView });
-            } catch (e) {
-                console.error(e);
-            } finally {
-                loading = false;
+             }
+
+            const registerForm = document.getElementById('registerForm');
+             if (registerForm && registerModal && loginModal) {
+                registerForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const submitButton = e.target.querySelector('button[type="submit"]');
+                    const formData = { nama: document.getElementById('regNama').value, email: document.getElementById('regEmail').value, password: document.getElementById('regPassword').value, domisili: document.getElementById('regDomisili').value, telepon: document.getElementById('regTelepon').value };
+                    submitButton.disabled = true; submitButton.textContent = 'Mendaftarkan...';
+                    fetch('register_process.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) })
+                    .then(response => response.json())
+                    .then(data => {
+                        showCustomAlert(data.message, data.success ? 'success' : 'error');
+                        if (data.success) { registerModal.hide(); loginModal.show(); e.target.reset(); }
+                    })
+                    .catch(error => { console.error('Error:', error); showCustomAlert('Terjadi kesalahan koneksi.', 'error'); })
+                    .finally(() => { submitButton.disabled = false; submitButton.textContent = 'Register'; });
+                });
+             }
+
+            const togglePassword = document.getElementById('togglePassword'); if (togglePassword) { togglePassword.addEventListener('click', function () { const passwordInput = document.getElementById('loginPassword'); const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password'; passwordInput.setAttribute('type', type); this.classList.toggle('fa-eye'); this.classList.toggle('fa-eye-slash'); }); }
+
+            const checkAllCuration = document.getElementById('checkAllCuration');
+            const curationTableBody = document.getElementById('curationTableBody');
+            const btnVerifyCuration = document.getElementById('btnVerifyCuration');
+            const btnDeleteCuration = document.getElementById('btnDeleteCuration');
+            const curationRowsSelect = document.getElementById('curationRows');
+
+            function checkCurationButtonState() { if (!curationTableBody) return; const checkedRows = curationTableBody.querySelectorAll('.check-row-curation:checked'); const hasSelection = checkedRows.length > 0; if (btnVerifyCuration) btnVerifyCuration.disabled = !hasSelection; if (btnDeleteCuration) btnDeleteCuration.disabled = !hasSelection; }
+
+            if (checkAllCuration && curationTableBody) {
+                checkAllCuration.addEventListener('change', function () { const rowCheckboxes = curationTableBody.querySelectorAll('.check-row-curation'); rowCheckboxes.forEach(cb => { cb.checked = this.checked; }); checkCurationButtonState(); });
+                curationTableBody.addEventListener('change', (e) => { if (e.target.classList.contains('check-row-curation')) { checkCurationButtonState(); if (checkAllCuration) { const total = curationTableBody.querySelectorAll('.check-row-curation').length; const checked = curationTableBody.querySelectorAll('.check-row-curation:checked').length; checkAllCuration.checked = total > 0 && total === checked; } } });
             }
-        }
+            
+            // --- [DIUBAH] Menggunakan showCustomConfirm ---
+            if (btnVerifyCuration) {
+                btnVerifyCuration.addEventListener('click', async () => { 
+                    const checkedRows = curationTableBody.querySelectorAll('.check-row-curation:checked');
+                    const idsToVerify = Array.from(checkedRows).map(cb => cb.value);
+                    if (idsToVerify.length === 0) return;
 
-        // ========= Refresh opsi Provinsi & Keparahan =========
-        async function refreshFilters(opts = { reload: true }) {
-            const prevProv = provSelect.value || '';
-            const prevSev  = sevSelect.value  || '';
+                    // Tampilkan konfirmasi kustom
+                    const userConfirmed = await showCustomConfirm(`Anda yakin ingin memverifikasi ${idsToVerify.length} data terpilih?`);
+                    
+                    if (!userConfirmed) return; // Jika pengguna klik "Tidak"
 
-            // -- Sertakan semua filter saat refresh --
-            const body = new URLSearchParams({
-                act:   'filters',
-                bulan: bulanSelect ? (bulanSelect.value || '') : '',
-                tahun: tahunSelect ? (tahunSelect.value || '') : '',
-                pengambilan: pengambilanSelect ? (pengambilanSelect.value || '') : '' // <-- Tambahkan ini
-            });
+                    btnVerifyCuration.disabled = true; btnVerifyCuration.textContent = 'Memverifikasi...';
+                    try {
+                        const response = await fetch('verify_data.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: idsToVerify }) });
+                        const result = await response.json();
+                        showCustomAlert(result.message, result.success ? 'success' : 'error', () => { if (result.success) { loadCurationData(); } });
+                    } catch (error) { console.error('Error verifying data:', error); showCustomAlert('Terjadi kesalahan koneksi saat verifikasi.', 'error');
+                    } finally { btnVerifyCuration.disabled = true; /* Akan di-enable lagi oleh checkCurationButtonState() */ btnVerifyCuration.textContent = 'Verifikasi Data Terpilih'; }
+                });
+            }
+            
+            // --- [DIUBAH] Menggunakan showCustomConfirm ---
+            if (btnDeleteCuration){
+                btnDeleteCuration.addEventListener('click', async () => {
+                    const checkedRows = curationTableBody.querySelectorAll('.check-row-curation:checked');
+                    const idsToDelete = Array.from(checkedRows).map(cb => cb.value);
+                    if (idsToDelete.length === 0) return;
 
-            try {
-            const resp = await fetch('api.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: body.toString()
-            });
-            const json = await resp.json();
+                    // Tampilkan konfirmasi kustom
+                    const userConfirmed = await showCustomConfirm(`Anda yakin ingin menghapus ${idsToDelete.length} data terpilih? Tindakan ini tidak dapat dibatalkan.`);
 
-            // --- Rebuild Provinsi ---
-            provSelect.innerHTML = '';
-            const optAllProv = document.createElement('option');
-            optAllProv.value = '';
-            optAllProv.textContent = 'Semua Provinsi';
-            provSelect.appendChild(optAllProv);
+                    if (!userConfirmed) return; // Jika pengguna klik "Tidak"
 
-            (json.provinsi || []).forEach(p => {
-                const o = document.createElement('option');
-                o.value = p;
-                o.textContent = p;
-                provSelect.appendChild(o);
-            });
-
-            // restore pilihan lama jika masih tersedia
-            if (prevProv && (json.provinsi || []).includes(prevProv)) {
-                provSelect.value = prevProv;
-            } else {
-                provSelect.value = '';
+                    btnDeleteCuration.disabled = true; const oldText = btnDeleteCuration.textContent; btnDeleteCuration.textContent = 'Menghapus...';
+                    try {
+                        const response = await fetch('delete_data.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: idsToDelete }) });
+                        const result = await response.json();
+                        const alertMessage = result.message || (result.success ? 'Berhasil menghapus data.' : 'Gagal menghapus data.');
+                        showCustomAlert(alertMessage, result.success ? 'success' : 'error', () => { if (result.success) { loadCurationData(); } });
+                    } catch (err) { console.error('Error deleting data:', err); showCustomAlert('Terjadi kesalahan koneksi saat menghapus.', 'error');
+                    } finally { btnDeleteCuration.disabled = true; /* Akan di-enable lagi oleh checkCurationButtonState() */ btnDeleteCuration.textContent = oldText; }
+                });
             }
 
-            // --- Rebuild Severity ---
-            const labelMap = {
-                '0'     : '0% (Tidak Ada Insidensi)',
-                '1-10'  : '1–10% (Ringan)',
-                '10-30' : '>10–30% (Sedang)',
-                '30-50' : '>30–50% (Berat)',
-                '50+'   : '≥50% (Sangat Berat)'
-            };
-
-            sevSelect.innerHTML = '';
-            const optAllSev = document.createElement('option');
-            optAllSev.value = '';
-            optAllSev.textContent = 'Semua Keparahan';
-            sevSelect.appendChild(optAllSev);
-
-            (json.severity || []).forEach(k => {
-                const o = document.createElement('option');
-                o.value = k;
-                o.textContent = labelMap[k] || k;
-                sevSelect.appendChild(o);
-            });
-
-            if (prevSev && (json.severity || []).includes(prevSev)) {
-                sevSelect.value = prevSev;
-            } else {
-                sevSelect.value = '';
+            if (curationRowsSelect) {
+                 curationRowsSelect.addEventListener('change', () => { loadCurationData(); });
             }
 
-            // setelah opsi diperbarui → muat ulang layer sesuai filter baru
-            if (opts.reload) {
-                loadGeoByLevel(currentMapLevel || 'provinsi', { preserveView: true });
+            document.querySelectorAll('#curationTable thead th.sortable').forEach(th => { th.style.cursor = 'pointer'; th.addEventListener('click', () => { const s = th.getAttribute('data-sort'); if (!s) return; if (curationSort === s) { curationDir = (curationDir === 'ASC') ? 'DESC' : 'ASC'; } else { curationSort = s; curationDir = 'ASC'; } curationPage = 1; loadCurationData(); }); });
+            
+            if (curationRowsSelect) {
+                 curationRowsSelect.addEventListener('change', () => { curationPage = 1; loadCurationData(); });
             }
-            } catch (e) {
-            console.error('refreshFilters failed', e);
-            }
-        }
 
-        // ===== Reaksi terhadap filter UI =====
-        sevSelect.addEventListener('change', () => applyLayer({ preserveView: true }));
-        // Fokus ke area terpilih (fitBounds) setelah pilih provinsi
-        provSelect.addEventListener('change', () => {
-            loadGeoByLevel(currentMapLevel || 'provinsi', { preserveView: false });
+
+            async function loadCurationData() { /* ... (fungsi loadCurationData tidak berubah) ... */ const limit = parseInt(curationRowsSelect?.value || '10', 10); const loadingRow = '<tr><td colspan="12" class="text-center">Memuat data...</td></tr>'; if(curationTableBody) curationTableBody.innerHTML = loadingRow; try { const url = `get_curation_data.php?limit=${encodeURIComponent(limit)}&page=${encodeURIComponent(curationPage)}&sort=${encodeURIComponent(curationSort)}&dir=${encodeURIComponent(curationDir)}`; const response = await fetch(url); const result = await response.json(); if(curationTableBody) curationTableBody.innerHTML = ''; if (result.success) { const rows = result.data || []; if (rows.length > 0) { rows.forEach(row => { const tr = ` <tr> <td><input class="form-check-input check-row-curation" type="checkbox" value="${row.id}"></td> <td>${row.tanggal_input ?? '-'}</td> <td>${row.kecamatan_simple || '-'}</td> <td>${row.nama_wilayah || '-'}</td> <td>${row.waktu_semai ?? '-'}</td> <td>${row.pengambilan_data ?? '-'}</td> <td>${row.suhu ?? '-'}</td> <td>${row.presipitasi ?? '-'}</td> <td>${row.populasi_wereng ?? '-'}</td> <td>${row.varietas_padi || '-'}</td> <td>${row.virulensi || '-'}</td> <td>${row.persentase_insidensi ?? '-'}</td> </tr> `; if(curationTableBody) curationTableBody.insertAdjacentHTML('beforeend', tr); }); if(curationInfoEl) curationInfoEl.textContent = `Halaman ${result.page} dari ${result.total_pages} • Total ${result.total} data`; buildPagination(result.total_pages, result.page); } else { if(curationInfoEl) curationInfoEl.textContent = 'Halaman 1 dari 1 • Total 0 data'; if(curationPaginationEl) curationPaginationEl.innerHTML = ''; if(curationTableBody) curationTableBody.innerHTML = '<tr><td colspan="12" class="text-center">Tidak ada data untuk diverifikasi.</td></tr>'; } } else { if(curationInfoEl) curationInfoEl.textContent = ''; if(curationPaginationEl) curationPaginationEl.innerHTML = ''; if(curationTableBody) curationTableBody.innerHTML = `<tr><td colspan="12" class="text-center text-danger">Gagal memuat data: ${result.message || 'Kesalahan tidak diketahui.'}</td></tr>`; console.error("Gagal load kurasi:", result.message); } } catch (error) { console.error('Error fetching curation data:', error); if(curationInfoEl) curationInfoEl.textContent = ''; if(curationPaginationEl) curationPaginationEl.innerHTML = ''; if(curationTableBody) curationTableBody.innerHTML = '<tr><td colspan="12" class="text-center text-danger">Gagal memuat data. Periksa koneksi atau log server.</td></tr>'; } finally { if(checkAllCuration) checkAllCuration.checked = false; checkCurationButtonState(); setSortIndicator(); } }
+
+            // Panggil loadCurationData jika modal kurasi ada saat load halaman (jika diperlukan)
+            // if (curationModalEl) {
+            //    loadCurationData(); // Uncomment jika data perlu dimuat saat halaman pertama kali dibuka
+            // }
+
         });
-
-        if (bulanSelect) bulanSelect.addEventListener('change', () => {
-            refreshFilters({ reload: true });
-        });
-        if (tahunSelect) tahunSelect.addEventListener('change', () => {
-            refreshFilters({ reload: true });
-        });
-        // -- Tambahkan event listener untuk filter baru --
-        if (pengambilanSelect) pengambilanSelect.addEventListener('change', () => {
-            refreshFilters({ reload: true });
-        });
-
-
-        // ===== Initial load =====
-        // 1) bangun opsi awal sesuai bulan/tahun default
-        refreshFilters({ reload: false }).then(() => {
-            // 2) baru load peta pertama kali
-            loadGeoByLevel(decideLevelByZoom(), { preserveView: false });
-        });
-
-
-        // ====== Reaksi terhadap zoom ======
-        function handleZoomChange(){
-            if (zoomLock) return; // sedang lock → abaikan
-            if (zoomChangeTimer) clearTimeout(zoomChangeTimer);
-            zoomChangeTimer = setTimeout(() => {
-                const desired = decideLevelByZoom();
-                if (desired !== currentMapLevel) {
-                // ganti level tanpa fitBounds (preserve view)
-                loadGeoByLevel(desired, { preserveView: true });
-                }
-            }, 120); // debounce 120ms
-        }
-        map.on('zoomend', handleZoomChange);
-
-        })();
     </script>
-
-    <script>
-        (function(){
-        const gaugeEl = document.getElementById('apiGauge');
-        if(!gaugeEl) return;
-
-        const pct       = Number(gaugeEl.dataset.percent || 0); // 0..100
-        const stepsText = gaugeEl.dataset.steps || '';
-
-        const value = Math.max(0, Math.min(100, pct));
-        const data  = [value, 100 - value];
-
-        const filledColor = 'rgba(54, 162, 235, 1)';   // warna progress
-        const emptyColor  = 'rgba(230, 236, 245, .9)';
-
-        const ctxGauge = gaugeEl.getContext('2d');
-        new Chart(ctxGauge, {
-            type: 'doughnut',
-            data: {
-            labels: ['Terpakai','Sisa'],
-            datasets: [{
-                data: data,
-                backgroundColor: [filledColor, emptyColor],
-                borderWidth: 0
-            }]
-            },
-            options: {
-            maintainAspectRatio: false,
-            cutoutPercentage: 75,
-            rotation: Math.PI,          // mulai dari 180°
-            circumference: Math.PI,     // setengah lingkaran
-            legend: { display: false },
-            tooltips: { enabled: false },
-            animation: { animateRotate: true, duration: 700 }
-            }
-        });
-
-        // update label overlay
-        const pctLabel  = document.querySelector('.gauge-percent');
-        const stepLabel = document.querySelector('.gauge-steps');
-        if (pctLabel)  pctLabel.textContent  = value.toFixed(1) + '%';
-        if (stepLabel) stepLabel.textContent = stepsText;
-        })();
-    </script>
-
-
-
 </body>
 
 <?php
     mysqli_close($conn);
-        
 ?>
